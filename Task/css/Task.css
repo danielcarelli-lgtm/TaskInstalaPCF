@@ -6,10 +6,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     width: 100%; height: 100%;
     display: flex; flex-direction: column;
     box-sizing: border-box;
-    position: relative; /* Para el absolute del versionado */
+    position: relative; 
 }
 
-/* Versionado arriba a la derecha */
 .v-tag { 
     position: absolute; top: 5px; right: 10px; 
     font-size: 10px; color: #999; 
@@ -28,7 +27,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 /* GRID BODY */
 .grid-body { flex-grow: 1; overflow-y: auto; width: 100%; }
 
-/* FILA - ALTURA 25PX (DIRECTIVA) */
+/* FILA - ALTURA 25PX */
 .grid-row { display: flex; width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; }
 .grid-row:hover { background-color: #eff6fc; }
 
@@ -38,15 +37,34 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .row-parent { background-color: #fff; }
 .row-child { background-color: #fafafa; color: #605e5c; }
 
-/* ANCHOS DE COLUMNAS (Total debe acercarse al 100% o usar flex-grow) */
-.w-nro { width: 50px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
-.w-id { width: 60px; text-align: center; }
-.w-name { flex-grow: 2; min-width: 200px; display: flex; align-items: center; } 
-.w-dep { flex-grow: 1; min-width: 120px; color: #666; font-style: italic; } /* Nueva columna */
-.w-date { width: 80px; text-align: center; }
-.w-num { width: 90px; text-align: right; } /* Más ancho para "Esfuerzo Estimado" */
-.w-prog { width: 120px; display: flex; align-items: center; }
-.w-stat { width: 90px; text-align: center; }
+/* === ANCHOS DE COLUMNAS ACTUALIZADOS === */
+.w-nro { width: 40px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
+.w-id { width: 50px; text-align: center; }
+.w-name { flex-grow: 2; min-width: 180px; display: flex; align-items: center; } 
+.w-members { width: 80px; display: flex; align-items: center; } /* Nueva columna */
+
+/* Ampliadas Inicio/Fin */
+.w-date { width: 90px; text-align: center; } 
+
+.w-dep { width: 100px; color: #666; font-style: italic; } /* Dependencia */
+.w-num { width: 70px; text-align: right; }
+.w-prog { width: 110px; display: flex; align-items: center; }
+.w-stat { width: 80px; text-align: center; }
+
+/* === ESTILOS AVATARES (MIEMBROS) === */
+.members-container { display: flex; align-items: center; height: 100%; }
+.member-avatar { 
+    width: 18px; height: 18px; 
+    border-radius: 50%; 
+    color: white; 
+    font-size: 9px; 
+    text-align: center; 
+    line-height: 18px; 
+    margin-right: 2px;
+    font-weight: 600;
+    cursor: default;
+}
+.member-avatar.overflow { background-color: #ccc; color: #333; font-size: 8px; }
 
 /* Elementos Visuales */
 .toggle-btn { cursor: pointer; font-size: 10px; width: 18px; text-align: center; color: #666; display: inline-block; margin-right: 2px;}
@@ -55,21 +73,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .link-name { color: #0078d4; cursor: pointer; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-name:hover { text-decoration: underline; }
 
-/* BARRA DE PROGRESO (SOLO LECTURA) */
-.prog-bar-container { 
-    flex-grow: 1; 
-    height: 8px; 
-    background-color: #e0e0e0; /* Gris de fondo */
-    border-radius: 4px; 
-    margin-right: 8px; 
-    overflow: hidden;
-}
-.prog-bar-fill { 
-    height: 100%; 
-    background-color: #107c10; /* Verde */
-    border-radius: 4px; 
-    transition: width 0.3s ease;
-}
+/* BARRA DE PROGRESO */
+.prog-bar-container { flex-grow: 1; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 8px; overflow: hidden; }
+.prog-bar-fill { height: 100%; background-color: #107c10; border-radius: 4px; transition: width 0.3s ease; }
 .lbl-percent { font-size: 11px; width: 30px; text-align: right; color: #333; font-weight: 600; }
 
 /* BADGES */

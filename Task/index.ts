@@ -12,7 +12,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
             
-            // --- EXTRACCIÓN ROBUSTA DE PADRE (ID y NOMBRE) ---
+            // Extracción de Padre
             const rawParent = record.getValue("sec_tareaprincipalid");
             let cleanParentId: string | undefined = undefined;
             let parentName: string = "";
@@ -20,20 +20,18 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
             if (rawParent) {
                 if (Array.isArray(rawParent) && rawParent.length > 0) {
                     cleanParentId = rawParent[0].id; 
-                    parentName = rawParent[0].name; // Extraemos nombre para la columna
+                    parentName = rawParent[0].name;
                 } else if (typeof rawParent === 'object') {
                      if (rawParent.id && rawParent.id.guid) cleanParentId = rawParent.id.guid;
                      else if (rawParent.id && typeof rawParent.id === 'string') cleanParentId = rawParent.id;
-                     
                      if (rawParent.name) parentName = rawParent.name;
                 }
             }
-
             if (cleanParentId) cleanParentId = cleanParentId.replace(/[{}]/g, '').toLowerCase();
 
             return {
                 id: id.replace(/[{}]/g, '').toLowerCase(), 
-                originalId: id,
+                originalId: id, // Necesitamos el ID original con llaves para el FetchXML a veces, o limpio, probaremos limpio
                 idTarea: record.getFormattedValue("sec_idtarea"),
                 nombre: record.getFormattedValue("sec_name"),
                 inicio: record.getFormattedValue("sec_inicio"),
@@ -43,32 +41,28 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 progreso: parseInt(record.getFormattedValue("sec_progreso")) || 0,
                 estado: record.getFormattedValue("statuscode"),
                 parentId: cleanParentId,
-                parentName: parentName, // Nuevo campo
+                parentName: parentName,
                 entityName: record.getNamedReference().entityType,
                 virtualNro: 0
             };
         });
 
-        // --- ALGORITMO ORDENACIÓN ---
+        // Algoritmo de Ordenación
         const parents = rawItems.filter(x => !x.parentId);
         const children = rawItems.filter(x => x.parentId);
-
         parents.forEach((parent, index) => { parent.virtualNro = index + 1; });
-
         parents.forEach(parent => {
             const myChildren = children.filter(c => c.parentId === parent.id);
-            myChildren.forEach((child, idx) => {
-                child.virtualNro = parent.virtualNro + ((idx + 1) / 100);
-            });
+            myChildren.forEach((child, idx) => { child.virtualNro = parent.virtualNro + ((idx + 1) / 100); });
         });
-
         children.forEach(child => { if (child.virtualNro === 0) child.virtualNro = 9999; });
 
         const sortedItems = [...parents, ...children].sort((a, b) => a.virtualNro - b.virtualNro);
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.5.5",
+            version: "1.5.6",
+            context: context, // Pasamos el contexto completo para la WebAPI
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
             },
@@ -84,7 +78,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 }
                 void context.navigation.openForm({ entityName: "sec_tarea", useQuickCreateForm: true }, formParams);
             },
-            onUpdateProgreso: (id, val) => { /* Read Only en esta versión, pero mantenemos la prop por si acaso */ }
+            onUpdateProgreso: (id, val) => { }
         };
         
         return React.createElement(HelloWorld, props);
