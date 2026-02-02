@@ -12,12 +12,10 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
             
-            // --- Helper para extraer Lookup (usado para Padre y Dependencia) ---
             const getLookupVal = (field: string): {id?: string, name: string} => {
                 const raw = record.getValue(field);
                 let resId: string | undefined = undefined;
                 let resName = "";
-                
                 if (raw) {
                     if (Array.isArray(raw) && raw.length > 0) {
                         resId = raw[0].id; resName = raw[0].name;
@@ -32,7 +30,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
             };
 
             const parentData = getLookupVal("sec_tareaprincipalid");
-            const depData = getLookupVal("sec_dependenciaid"); // NUEVO: Extraemos la dependencia correcta
+            const depData = getLookupVal("sec_dependenciaid");
 
             return {
                 id: id.replace(/[{}]/g, '').toLowerCase(), 
@@ -46,8 +44,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 progreso: parseInt(record.getFormattedValue("sec_progreso")) || 0,
                 estado: record.getFormattedValue("statuscode"),
                 parentId: parentData.id,
-                // parentName: parentData.name, // Ya no mostramos nombre de padre, mostramos dependencia
-                depName: depData.name, // NUEVO: Nombre de la dependencia
+                depName: depData.name,
                 entityName: record.getNamedReference().entityType,
                 virtualNro: 0
             };
@@ -67,7 +64,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.6.0",
+            version: "1.6.1",
             context: context, 
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
@@ -85,23 +82,12 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 void context.navigation.openForm({ entityName: "sec_tarea", useQuickCreateForm: true }, formParams);
             },
             onUpdateProgreso: (id, val) => { },
-            // NUEVO: Función para cambiar de padre al soltar
             onReparentTask: (childId, newParentId) => {
                 console.log(`Reparenting: ${childId} -> under -> ${newParentId}`);
-                
-                // Binding para Lookup es: nombre_campo@odata.bind = "/entidad(id)"
-                const data = {
-                    "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})`
-                };
-
+                const data = { "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})` };
                 context.webAPI.updateRecord("sec_tarea", childId, data).then(
-                    () => { 
-                        // Forzamos refresco del dataset UI
-                         ds.refresh();
-                    },
-                    (err) => { 
-                        context.navigation.openErrorDialog({ message: "Error moviendo tarea: " + err.message }); 
-                    }
+                    () => { ds.refresh(); },
+                    (err) => { context.navigation.openErrorDialog({ message: "Error moviendo tarea: " + err.message }); }
                 );
             }
         };

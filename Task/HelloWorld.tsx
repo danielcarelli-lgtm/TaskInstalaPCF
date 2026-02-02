@@ -22,14 +22,14 @@ export interface IHelloWorldProps {
     onOpenTask: (etn: string, id: string) => void;
     onCreateTask: () => void;
     onUpdateProgreso: (id: string, val: number) => void;
-    onReparentTask: (childId: string, newParentId: string) => void; // Callback Drag&Drop
+    onReparentTask: (childId: string, newParentId: string) => void; 
 }
 
 interface IHelloWorldState {
     collapsedParents: string[];
 }
 
-// === FACEPILE (Sin Cambios) ===
+// === FACEPILE ===
 const MemberFacepile = (props: { taskId: string, webAPI: ComponentFramework.WebApi }) => {
     const [members, setMembers] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -71,44 +71,57 @@ const MemberFacepile = (props: { taskId: string, webAPI: ComponentFramework.WebA
     );
 };
 
-// === FILA CON DRAG & DROP ===
+// === FILA CON VALIDACIONES DRAG & DROP ===
 const TaskRow = (props: { 
     task: ITaskItem, 
+    allTasks: ITaskItem[], // Pasamos todas las tareas para validar hijos
     isCollapsed: boolean,
     onToggle: (id: string) => void,
     onOpen: (etn: string, id: string) => void,
     webAPI: ComponentFramework.WebApi,
     onDropAction: (draggedId: string, targetId: string) => void
 }) => {
-    const { task, isCollapsed, onToggle, onOpen, webAPI, onDropAction } = props;
+    const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, onDropAction } = props;
     const isParent = Number.isInteger(task.virtualNro);
     const [isDragOver, setIsDragOver] = React.useState(false);
 
-    // Eventos Drag & Drop
     const handleDragStart = (e: React.DragEvent) => {
-        // Guardamos el ID de la tarea que estamos arrastrando
         e.dataTransfer.setData("text/plain", task.id);
         e.dataTransfer.effectAllowed = "move";
     };
 
     const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Necesario para permitir el Drop
+        e.preventDefault(); 
         if (!isDragOver) setIsDragOver(true);
     };
 
-    const handleDragLeave = () => {
-        setIsDragOver(false);
-    };
+    const handleDragLeave = () => { setIsDragOver(false); };
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(false);
         const draggedId = e.dataTransfer.getData("text/plain");
         
-        // Evitar soltar sobre sí mismo
-        if (draggedId && draggedId !== task.id) {
-            onDropAction(draggedId, task.id);
+        if (!draggedId || draggedId === task.id) return;
+
+        // --- VALIDACIONES ---
+
+        // 1. Si la tarea destino (donde suelto) YA ES SECUNDARIA (tiene parentId)
+        if (task.parentId) {
+            alert("⚠️ ¡Acción Denegada!\n\nNo aceptamos 'nietos' en esta lista. Esta tarea ya es secundaria, así que no puede tener subordinados.");
+            return; // Cancelar drop (revert visual implícito)
         }
+
+        // 2. Si la tarea origen (la que arrastro) TIENE HIJOS
+        // Buscamos en todas las tareas si alguna tiene como parentId el ID que estoy arrastrando
+        const hasChildren = allTasks.some(t => t.parentId === draggedId);
+        if (hasChildren) {
+            alert("🛑 ¡Alto ahí!\n\nEsta tarea es una 'Jefa' con subtareas a su cargo. No puedes moverla entera. Libérala de sus hijos primero.");
+            return; // Cancelar drop
+        }
+
+        // Si pasa, ejecutamos
+        onDropAction(draggedId, task.id);
     };
 
     return (
@@ -142,10 +155,7 @@ const TaskRow = (props: {
 
             <div className="gd-cell w-date" title={task.inicio}>{task.inicio}</div>
             <div className="gd-cell w-date" title={task.fin}>{task.fin}</div>
-            
-            {/* Dato corregido: sec_dependenciaid */}
             <div className="gd-cell w-dep" title={`Dependencia: ${task.depName}`}>{task.depName}</div>
-
             <div className="gd-cell w-num" title="Esfuerzo Estimado">{task.esfuerzo}</div>
             <div className="gd-cell w-num" title="Horas Imputadas">{task.imputadas}</div>
             
@@ -190,7 +200,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
                     <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>
-                        💡 Arrastra una tarea sobre otra para asignarla como hija.
+                        💡 Arrastra tareas para organizarlas. (Reglas: Sin nietos, Sin mover padres con hijos).
                     </span>
                 </div>
                 
@@ -211,6 +221,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="grid-body">
                     {visibleTasks.map((task) => (
                         <TaskRow key={task.id} task={task} 
+                            allTasks={this.props.tasks} // IMPORTANTE: Pasamos la lista completa
                             isCollapsed={this.state.collapsedParents.includes(task.id)}
                             onToggle={this.toggleParent}
                             onOpen={this.props.onOpenTask}
