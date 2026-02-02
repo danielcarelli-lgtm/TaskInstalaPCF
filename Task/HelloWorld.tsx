@@ -11,25 +11,25 @@ import * as React from 'react';
 export interface ITaskItem {
     id: string; originalId?: string; idTarea: string; nombre: string; inicio: string;
     fin: string; esfuerzo: string; imputadas: string; progreso: number; 
-    estado: string; parentId?: string; parentName?: string; entityName: string;
+    estado: string; parentId?: string; depName?: string; entityName: string;
     virtualNro: number; 
 }
 
 export interface IHelloWorldProps { 
     tasks: ITaskItem[]; 
     version: string;
-    // Contexto tipado de forma flexible para evitar bloqueos
     context: ComponentFramework.Context<any>; 
     onOpenTask: (etn: string, id: string) => void;
     onCreateTask: () => void;
     onUpdateProgreso: (id: string, val: number) => void;
+    onReparentTask: (childId: string, newParentId: string) => void; // Callback Drag&Drop
 }
 
 interface IHelloWorldState {
     collapsedParents: string[];
 }
 
-// Subcomponente para pintar los miembros del equipo (Facepile)
+// === FACEPILE (Sin Cambios) ===
 const MemberFacepile = (props: { taskId: string, webAPI: ComponentFramework.WebApi }) => {
     const [members, setMembers] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -45,61 +45,81 @@ const MemberFacepile = (props: { taskId: string, webAPI: ComponentFramework.WebA
                 </filter>
             </entity>
         </fetch>`;
-
         const query = `?fetchXml=${encodeURIComponent(fetchXml)}`;
-
-        // Llamada segura a la API
         props.webAPI.retrieveMultipleRecords("sec_miembrodelequipo", query).then(
             (result: any) => {
-                // Mapeo seguro con cast implícito permitido por las directivas
                 const names = result.entities.map((e: any) => e.sec_name);
                 setMembers(names);
                 setLoading(false);
             },
-            (error: any) => {
-                console.error("Error fetching members", error);
-                setLoading(false);
-            }
+            () => { setLoading(false); }
         );
     }, [props.taskId]); 
 
     if (loading) return <span style={{fontSize:'9px', color:'#ccc'}}>...</span>;
     if (members.length === 0) return null;
-
     return (
         <div className="members-container">
             {members.slice(0, 3).map((name, i) => {
                 const initials = name ? name.substring(0, 2).toUpperCase() : "?";
                 const colors = ['#0078d4', '#498205', '#a4262c', '#69797e', '#4f6bed'];
                 const color = colors[name ? name.length % colors.length : 0];
-                
-                return (
-                    <div key={i} className="member-avatar" title={name} style={{backgroundColor: color}}>
-                        {initials}
-                    </div>
-                );
+                return ( <div key={i} className="member-avatar" title={name} style={{backgroundColor: color}}>{initials}</div> );
             })}
-            {members.length > 3 && (
-                <div className="member-avatar overflow" title={`+${members.length - 3} más`}>
-                    +{members.length - 3}
-                </div>
-            )}
+            {members.length > 3 && <div className="member-avatar overflow" title={`+${members.length - 3} más`}>+{members.length - 3}</div>}
         </div>
     );
 };
 
+// === FILA CON DRAG & DROP ===
 const TaskRow = (props: { 
     task: ITaskItem, 
     isCollapsed: boolean,
     onToggle: (id: string) => void,
     onOpen: (etn: string, id: string) => void,
-    webAPI: ComponentFramework.WebApi
+    webAPI: ComponentFramework.WebApi,
+    onDropAction: (draggedId: string, targetId: string) => void
 }) => {
-    const { task, isCollapsed, onToggle, onOpen, webAPI } = props;
+    const { task, isCollapsed, onToggle, onOpen, webAPI, onDropAction } = props;
     const isParent = Number.isInteger(task.virtualNro);
+    const [isDragOver, setIsDragOver] = React.useState(false);
+
+    // Eventos Drag & Drop
+    const handleDragStart = (e: React.DragEvent) => {
+        // Guardamos el ID de la tarea que estamos arrastrando
+        e.dataTransfer.setData("text/plain", task.id);
+        e.dataTransfer.effectAllowed = "move";
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necesario para permitir el Drop
+        if (!isDragOver) setIsDragOver(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const draggedId = e.dataTransfer.getData("text/plain");
+        
+        // Evitar soltar sobre sí mismo
+        if (draggedId && draggedId !== task.id) {
+            onDropAction(draggedId, task.id);
+        }
+    };
 
     return (
-        <div className={`grid-row ${isParent ? 'row-parent' : 'row-child'}`}>
+        <div 
+            className={`grid-row ${isParent ? 'row-parent' : 'row-child'} ${isDragOver ? 'row-drag-over' : ''}`}
+            draggable="true"
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
             <div className="gd-cell w-nro" title="Orden Jerárquico">{task.virtualNro.toFixed(2)}</div>
             <div className="gd-cell w-id" title={task.idTarea}>{task.idTarea}</div>
             
@@ -123,7 +143,8 @@ const TaskRow = (props: {
             <div className="gd-cell w-date" title={task.inicio}>{task.inicio}</div>
             <div className="gd-cell w-date" title={task.fin}>{task.fin}</div>
             
-            <div className="gd-cell w-dep" title={`Depende de: ${task.parentName}`}>{task.parentName}</div>
+            {/* Dato corregido: sec_dependenciaid */}
+            <div className="gd-cell w-dep" title={`Dependencia: ${task.depName}`}>{task.depName}</div>
 
             <div className="gd-cell w-num" title="Esfuerzo Estimado">{task.esfuerzo}</div>
             <div className="gd-cell w-num" title="Horas Imputadas">{task.imputadas}</div>
@@ -168,6 +189,9 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="v-tag">v{this.props.version}</div>
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>
+                        💡 Arrastra una tarea sobre otra para asignarla como hija.
+                    </span>
                 </div>
                 
                 <div className="grid-header">
@@ -190,7 +214,8 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                             isCollapsed={this.state.collapsedParents.includes(task.id)}
                             onToggle={this.toggleParent}
                             onOpen={this.props.onOpenTask}
-                            webAPI={this.props.context.webAPI} 
+                            webAPI={this.props.context.webAPI}
+                            onDropAction={this.props.onReparentTask}
                         />
                     ))}
                 </div>

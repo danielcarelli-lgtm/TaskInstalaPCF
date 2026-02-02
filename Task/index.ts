@@ -12,26 +12,31 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
             
-            // Extracción de Padre
-            const rawParent = record.getValue("sec_tareaprincipalid");
-            let cleanParentId: string | undefined = undefined;
-            let parentName: string = "";
-
-            if (rawParent) {
-                if (Array.isArray(rawParent) && rawParent.length > 0) {
-                    cleanParentId = rawParent[0].id; 
-                    parentName = rawParent[0].name;
-                } else if (typeof rawParent === 'object') {
-                     if (rawParent.id && rawParent.id.guid) cleanParentId = rawParent.id.guid;
-                     else if (rawParent.id && typeof rawParent.id === 'string') cleanParentId = rawParent.id;
-                     if (rawParent.name) parentName = rawParent.name;
+            // --- Helper para extraer Lookup (usado para Padre y Dependencia) ---
+            const getLookupVal = (field: string): {id?: string, name: string} => {
+                const raw = record.getValue(field);
+                let resId: string | undefined = undefined;
+                let resName = "";
+                
+                if (raw) {
+                    if (Array.isArray(raw) && raw.length > 0) {
+                        resId = raw[0].id; resName = raw[0].name;
+                    } else if (typeof raw === 'object') {
+                        if (raw.id && raw.id.guid) resId = raw.id.guid;
+                        else if (raw.id && typeof raw.id === 'string') resId = raw.id;
+                        if (raw.name) resName = raw.name;
+                    }
                 }
-            }
-            if (cleanParentId) cleanParentId = cleanParentId.replace(/[{}]/g, '').toLowerCase();
+                if (resId) resId = resId.replace(/[{}]/g, '').toLowerCase();
+                return { id: resId, name: resName };
+            };
+
+            const parentData = getLookupVal("sec_tareaprincipalid");
+            const depData = getLookupVal("sec_dependenciaid"); // NUEVO: Extraemos la dependencia correcta
 
             return {
                 id: id.replace(/[{}]/g, '').toLowerCase(), 
-                originalId: id, // Necesitamos el ID original con llaves para el FetchXML a veces, o limpio, probaremos limpio
+                originalId: id,
                 idTarea: record.getFormattedValue("sec_idtarea"),
                 nombre: record.getFormattedValue("sec_name"),
                 inicio: record.getFormattedValue("sec_inicio"),
@@ -40,14 +45,15 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 imputadas: record.getFormattedValue("sec_horasimputadas"),
                 progreso: parseInt(record.getFormattedValue("sec_progreso")) || 0,
                 estado: record.getFormattedValue("statuscode"),
-                parentId: cleanParentId,
-                parentName: parentName,
+                parentId: parentData.id,
+                // parentName: parentData.name, // Ya no mostramos nombre de padre, mostramos dependencia
+                depName: depData.name, // NUEVO: Nombre de la dependencia
                 entityName: record.getNamedReference().entityType,
                 virtualNro: 0
             };
         });
 
-        // Algoritmo de Ordenación
+        // Ordenación
         const parents = rawItems.filter(x => !x.parentId);
         const children = rawItems.filter(x => x.parentId);
         parents.forEach((parent, index) => { parent.virtualNro = index + 1; });
@@ -61,8 +67,8 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.5.6",
-            context: context, // Pasamos el contexto completo para la WebAPI
+            version: "1.6.0",
+            context: context, 
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
             },
@@ -78,7 +84,26 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 }
                 void context.navigation.openForm({ entityName: "sec_tarea", useQuickCreateForm: true }, formParams);
             },
-            onUpdateProgreso: (id, val) => { }
+            onUpdateProgreso: (id, val) => { },
+            // NUEVO: Función para cambiar de padre al soltar
+            onReparentTask: (childId, newParentId) => {
+                console.log(`Reparenting: ${childId} -> under -> ${newParentId}`);
+                
+                // Binding para Lookup es: nombre_campo@odata.bind = "/entidad(id)"
+                const data = {
+                    "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})`
+                };
+
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(
+                    () => { 
+                        // Forzamos refresco del dataset UI
+                         ds.refresh();
+                    },
+                    (err) => { 
+                        context.navigation.openErrorDialog({ message: "Error moviendo tarea: " + err.message }); 
+                    }
+                );
+            }
         };
         
         return React.createElement(HelloWorld, props);
