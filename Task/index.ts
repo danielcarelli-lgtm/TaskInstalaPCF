@@ -50,7 +50,6 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
             };
         });
 
-        // Ordenación
         const parents = rawItems.filter(x => !x.parentId);
         const children = rawItems.filter(x => x.parentId);
         parents.forEach((parent, index) => { parent.virtualNro = index + 1; });
@@ -64,7 +63,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.6.1",
+            version: "1.7.0",
             context: context, 
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
@@ -88,6 +87,16 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 context.webAPI.updateRecord("sec_tarea", childId, data).then(
                     () => { ds.refresh(); },
                     (err) => { context.navigation.openErrorDialog({ message: "Error moviendo tarea: " + err.message }); }
+                );
+            },
+            // NUEVO: Función para quitar el padre (hacer principal)
+            onUnparentTask: (childId) => {
+                console.log(`Unparenting: ${childId}`);
+                // Enviar null al lookup limpia la relación
+                const data = { "sec_tareaprincipalid": null };
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(
+                    () => { ds.refresh(); },
+                    (err) => { context.navigation.openErrorDialog({ message: "Error al desvincular tarea: " + err.message }); }
                 );
             }
         };

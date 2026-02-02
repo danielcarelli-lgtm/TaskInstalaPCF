@@ -31,11 +31,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .grid-row { display: flex; width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; transition: background-color 0.2s; }
 .grid-row:hover { background-color: #eff6fc; }
 
-/* ESTILO DRAG OVER */
-.row-drag-over {
-    background-color: #c7e0f4 !important; /* Azul claro fuerte */
-    border: 2px dashed #0078d4; /* Borde punteado para indicar zona de drop */
-}
+.row-drag-over { background-color: #c7e0f4 !important; border: 2px dashed #0078d4; }
 
 /* CELDAS */
 .gd-cell { font-size: 12px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 25px; color: #323130; }
@@ -43,48 +39,47 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .row-parent { background-color: #fff; }
 .row-child { background-color: #fafafa; color: #605e5c; }
 
-/* === ANCHOS DE COLUMNAS ACTUALIZADOS === */
+/* Columnas */
 .w-nro { width: 40px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
 .w-id { width: 50px; text-align: center; }
 .w-name { flex-grow: 2; min-width: 180px; display: flex; align-items: center; } 
 .w-members { width: 80px; display: flex; align-items: center; }
-
-/* Ampliadas Inicio/Fin a 110px */
 .w-date { width: 110px; text-align: center; } 
-
 .w-dep { width: 100px; color: #666; font-style: italic; }
 .w-num { width: 70px; text-align: right; }
 .w-prog { width: 110px; display: flex; align-items: center; }
 .w-stat { width: 80px; text-align: center; }
 
-/* ESTILOS AVATARES (MIEMBROS) */
+/* Miembros */
 .members-container { display: flex; align-items: center; height: 100%; }
-.member-avatar { 
-    width: 18px; height: 18px; 
-    border-radius: 50%; 
-    color: white; 
-    font-size: 9px; 
-    text-align: center; 
-    line-height: 18px; 
-    margin-right: 2px;
-    font-weight: 600;
-    cursor: default;
-}
+.member-avatar { width: 18px; height: 18px; border-radius: 50%; color: white; font-size: 9px; text-align: center; line-height: 18px; margin-right: 2px; font-weight: 600; cursor: default; }
 .member-avatar.overflow { background-color: #ccc; color: #333; font-size: 8px; }
 
 /* Elementos Visuales */
 .toggle-btn { cursor: pointer; font-size: 10px; width: 18px; text-align: center; color: #666; display: inline-block; margin-right: 2px;}
+
+/* Estilo para la flechita clickable */
+.unbind-btn { 
+    color: #999; 
+    font-size: 14px; /* Un poco más grande para facilitar el click */
+    margin-right: 6px; 
+    cursor: pointer; 
+    font-weight: bold;
+    transition: color 0.2s;
+}
+.unbind-btn:hover { 
+    color: #d13438; /* Rojo Microsoft Error para indicar acción destructiva/separación */
+}
+
 .child-indicator { color: #ccc; font-size: 12px; margin-right: 6px; }
 
 .link-name { color: #0078d4; cursor: pointer; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-name:hover { text-decoration: underline; }
 
-/* BARRA DE PROGRESO */
+/* Progreso y Badges */
 .prog-bar-container { flex-grow: 1; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 8px; overflow: hidden; }
 .prog-bar-fill { height: 100%; background-color: #107c10; border-radius: 4px; transition: width 0.3s ease; }
 .lbl-percent { font-size: 11px; width: 30px; text-align: right; color: #333; font-weight: 600; }
-
-/* BADGES */
 .pill { padding: 1px 8px; border-radius: 10px; font-size: 10px; display: inline-block; height: 16px; line-height: 16px; font-weight: 600; }
 .s-done { background: #dff6dd; color: #107c10; }
 .s-pend { background: #deecf9; color: #0078d4; }
