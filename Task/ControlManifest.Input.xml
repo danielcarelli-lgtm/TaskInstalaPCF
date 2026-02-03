@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="sec" constructor="Task" version="1.7.0" display-name-key="Task" description-key="Task Control" control-type="virtual">
+  <control namespace="sec" constructor="Task" version="1.8.2" display-name-key="Task" description-key="Task Control" control-type="virtual">
     
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />

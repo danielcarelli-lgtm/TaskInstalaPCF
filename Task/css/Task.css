@@ -9,13 +9,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     position: relative; 
 }
 
-.v-tag { 
-    position: absolute; top: 5px; right: 10px; 
-    font-size: 10px; color: #999; 
-    background: #f0f0f0; padding: 2px 5px; border-radius: 4px;
-    z-index: 10;
-}
-
+.v-tag { position: absolute; top: 5px; right: 10px; font-size: 10px; color: #999; background: #f0f0f0; padding: 2px 5px; border-radius: 4px; z-index: 10; }
 .header-actions { padding: 8px; border-bottom: 1px solid #e0e0e0; background: #fff; display: flex; align-items: center; height: 40px; }
 .btn-new { background-color: #0078d4; color: white; border: none; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; }
 .btn-new:hover { background-color: #106ebe; }
@@ -27,56 +21,66 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 /* GRID BODY */
 .grid-body { flex-grow: 1; overflow-y: auto; width: 100%; }
 
-/* FILA - ALTURA 25PX */
 .grid-row { display: flex; width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; transition: background-color 0.2s; }
 .grid-row:hover { background-color: #eff6fc; }
-
 .row-drag-over { background-color: #c7e0f4 !important; border: 2px dashed #0078d4; }
 
-/* CELDAS */
 .gd-cell { font-size: 12px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 25px; color: #323130; }
 
 .row-parent { background-color: #fff; }
 .row-child { background-color: #fafafa; color: #605e5c; }
 
-/* Columnas */
+/* COLUMNAS */
 .w-nro { width: 40px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
 .w-id { width: 50px; text-align: center; }
 .w-name { flex-grow: 2; min-width: 180px; display: flex; align-items: center; } 
 .w-members { width: 80px; display: flex; align-items: center; }
 .w-date { width: 110px; text-align: center; } 
-.w-dep { width: 100px; color: #666; font-style: italic; }
+
+/* SELECT MODERNO (INVISIBLE) */
+.w-dep { width: 120px; color: #666; position: relative; } 
+.modern-select {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: transparent;
+    color: #555; /* Un poco más oscuro para legibilidad */
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    outline: none;
+    appearance: none; /* Quita el estilo nativo feo */
+    -webkit-appearance: none;
+    padding-right: 15px; /* Espacio para una flechita custom si quisieras, o invisible */
+}
+
+/* Hack para mostrar flechita solo en hover si se desea, o dejarlo limpio */
+.modern-select:hover {
+    background-color: #e1dfdd; /* Feedback ligero */
+    color: #000;
+}
+.modern-select option {
+    background-color: #fff;
+    color: #333;
+    padding: 5px;
+}
+
 .w-num { width: 70px; text-align: right; }
 .w-prog { width: 110px; display: flex; align-items: center; }
 .w-stat { width: 80px; text-align: center; }
 
-/* Miembros */
+/* Componentes */
 .members-container { display: flex; align-items: center; height: 100%; }
 .member-avatar { width: 18px; height: 18px; border-radius: 50%; color: white; font-size: 9px; text-align: center; line-height: 18px; margin-right: 2px; font-weight: 600; cursor: default; }
 .member-avatar.overflow { background-color: #ccc; color: #333; font-size: 8px; }
 
-/* Elementos Visuales */
 .toggle-btn { cursor: pointer; font-size: 10px; width: 18px; text-align: center; color: #666; display: inline-block; margin-right: 2px;}
-
-/* Estilo para la flechita clickable */
-.unbind-btn { 
-    color: #999; 
-    font-size: 14px; /* Un poco más grande para facilitar el click */
-    margin-right: 6px; 
-    cursor: pointer; 
-    font-weight: bold;
-    transition: color 0.2s;
-}
-.unbind-btn:hover { 
-    color: #d13438; /* Rojo Microsoft Error para indicar acción destructiva/separación */
-}
-
+.unbind-btn { color: #999; font-size: 14px; margin-right: 6px; cursor: pointer; font-weight: bold; transition: color 0.2s; }
+.unbind-btn:hover { color: #d13438; }
 .child-indicator { color: #ccc; font-size: 12px; margin-right: 6px; }
-
 .link-name { color: #0078d4; cursor: pointer; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .link-name:hover { text-decoration: underline; }
 
-/* Progreso y Badges */
 .prog-bar-container { flex-grow: 1; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 8px; overflow: hidden; }
 .prog-bar-fill { height: 100%; background-color: #107c10; border-radius: 4px; transition: width 0.3s ease; }
 .lbl-percent { font-size: 11px; width: 30px; text-align: right; color: #333; font-weight: 600; }

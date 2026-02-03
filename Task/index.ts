@@ -45,6 +45,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 estado: record.getFormattedValue("statuscode"),
                 parentId: parentData.id,
                 depName: depData.name,
+                depId: depData.id,
                 entityName: record.getNamedReference().entityType,
                 virtualNro: 0
             };
@@ -63,7 +64,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.7.0",
+            version: "1.8.2",
             context: context, 
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
@@ -82,21 +83,34 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
             },
             onUpdateProgreso: (id, val) => { },
             onReparentTask: (childId, newParentId) => {
-                console.log(`Reparenting: ${childId} -> under -> ${newParentId}`);
                 const data = { "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})` };
                 context.webAPI.updateRecord("sec_tarea", childId, data).then(
                     () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error moviendo tarea: " + err.message }); }
+                    (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); }
                 );
             },
-            // NUEVO: Función para quitar el padre (hacer principal)
             onUnparentTask: (childId) => {
-                console.log(`Unparenting: ${childId}`);
-                // Enviar null al lookup limpia la relación
                 const data = { "sec_tareaprincipalid": null };
                 context.webAPI.updateRecord("sec_tarea", childId, data).then(
                     () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error al desvincular tarea: " + err.message }); }
+                    (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); }
+                );
+            },
+            onUpdateDependency: (taskId, dependencyId) => {
+                console.log(`Update Dep: ${taskId} depends on ${dependencyId}`);
+                let data: any = {};
+                if (dependencyId) {
+                    // ID limpio para la API
+                    const cleanId = dependencyId.replace(/[{}]/g, '');
+                    data["sec_dependenciaid@odata.bind"] = `/sec_tareas(${cleanId})`;
+                } else {
+                    data["sec_dependenciaid"] = null;
+                }
+                // No llamamos a ds.refresh() inmediatamente aquí para evitar que sobrescriba el estado local
+                // React mantendrá el valor seleccionado visualmente.
+                context.webAPI.updateRecord("sec_tarea", taskId, data).then(
+                    () => { console.log("Dependencia guardada OK"); },
+                    (err) => { context.navigation.openErrorDialog({ message: "Error guardando dependencia: " + err.message }); }
                 );
             }
         };

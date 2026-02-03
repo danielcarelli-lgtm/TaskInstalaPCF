@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 /* eslint-disable promise/catch-or-return */
 /* eslint-disable promise/always-return */
 import * as React from 'react';
@@ -11,7 +12,9 @@ import * as React from 'react';
 export interface ITaskItem {
     id: string; originalId?: string; idTarea: string; nombre: string; inicio: string;
     fin: string; esfuerzo: string; imputadas: string; progreso: number; 
-    estado: string; parentId?: string; depName?: string; entityName: string;
+    estado: string; parentId?: string; 
+    depName?: string; depId?: string; 
+    entityName: string;
     virtualNro: number; 
 }
 
@@ -23,7 +26,8 @@ export interface IHelloWorldProps {
     onCreateTask: () => void;
     onUpdateProgreso: (id: string, val: number) => void;
     onReparentTask: (childId: string, newParentId: string) => void;
-    onUnparentTask: (childId: string) => void; // Nuevo Callback
+    onUnparentTask: (childId: string) => void;
+    onUpdateDependency: (taskId: string, dependencyId: string | null) => void;
 }
 
 interface IHelloWorldState {
@@ -34,7 +38,6 @@ interface IHelloWorldState {
 const MemberFacepile = (props: { taskId: string, webAPI: ComponentFramework.WebApi }) => {
     const [members, setMembers] = React.useState<string[]>([]);
     const [loading, setLoading] = React.useState(true);
-
     React.useEffect(() => {
         const fetchXml = `
         <fetch version="1.0" mapping="logical" no-lock="false" distinct="true">
@@ -81,44 +84,55 @@ const TaskRow = (props: {
     onOpen: (etn: string, id: string) => void,
     webAPI: ComponentFramework.WebApi,
     onDropAction: (draggedId: string, targetId: string) => void,
-    onUnparentAction: (id: string) => void // Recibimos la función
+    onUnparentAction: (id: string) => void,
+    onUpdateDep: (taskId: string, depId: string | null) => void
 }) => {
-    const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, onDropAction, onUnparentAction } = props;
+    const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, onDropAction, onUnparentAction, onUpdateDep } = props;
     const isParent = Number.isInteger(task.virtualNro);
     const [isDragOver, setIsDragOver] = React.useState(false);
+    
+    // --- ESTADO LOCAL PARA DEPENDENCIA (PERSISTENCIA VISUAL) ---
+    const [localDepId, setLocalDepId] = React.useState(task.depId || "");
 
+    // Sincronizar si cambia desde fuera (ej. carga inicial)
+    React.useEffect(() => {
+        setLocalDepId(task.depId || "");
+    }, [task.depId]);
+
+    // --- LOGICA DRAG & DROP ---
     const handleDragStart = (e: React.DragEvent) => {
         e.dataTransfer.setData("text/plain", task.id);
         e.dataTransfer.effectAllowed = "move";
     };
-
     const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (!isDragOver) setIsDragOver(true); };
     const handleDragLeave = () => { setIsDragOver(false); };
-
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault(); setIsDragOver(false);
         const draggedId = e.dataTransfer.getData("text/plain");
         if (!draggedId || draggedId === task.id) return;
-
-        if (task.parentId) {
-            alert("⚠️ ¡Acción Denegada!\n\nNo aceptamos 'nietos'. Esta tarea ya es secundaria.");
-            return; 
-        }
-        const hasChildren = allTasks.some(t => t.parentId === draggedId);
-        if (hasChildren) {
-            alert("🛑 ¡Alto ahí!\n\nEsta tarea tiene subtareas. No puedes moverla.");
-            return; 
-        }
+        if (task.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
+        if (allTasks.some(t => t.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
         onDropAction(draggedId, task.id);
     };
-
-    // Manejador del Click en la flechita
     const handleUnparentClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Evitar abrir la tarea
-        if (confirm(`¿Quieres convertir "${task.nombre}" en una Tarea Principal?`)) {
-            onUnparentAction(task.id);
-        }
+        e.stopPropagation();
+        if (confirm(`¿Convertir "${task.nombre}" en Principal?`)) onUnparentAction(task.id);
     };
+
+    // --- LOGICA DEPENDENCIA EDITABLE ---
+    const handleDepChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const val = e.target.value;
+        // 1. Actualizamos visualmente YA (sin esperar a Dynamics)
+        setLocalDepId(val);
+        // 2. Lanzamos la petición de guardado
+        onUpdateDep(task.id, val === "" ? null : val);
+    };
+
+    const availableDependencies = allTasks.filter(candidate => {
+        if (candidate.id === task.id) return false;
+        if (candidate.depId === task.id) return false;
+        return true;
+    });
 
     return (
         <div 
@@ -133,47 +147,50 @@ const TaskRow = (props: {
             <div className="gd-cell w-id" title={task.idTarea}>{task.idTarea}</div>
             
             <div className="gd-cell w-name" title={task.nombre} style={{ paddingLeft: isParent ? '0px' : '20px' }}>
-                {isParent && (
-                    <span className="toggle-btn" onClick={() => onToggle(task.id)}>
-                        {isCollapsed ? '▶' : '▼'}
-                    </span>
-                )}
-                {!isParent && (
-                    <span 
-                        className="child-indicator unbind-btn" 
-                        onClick={handleUnparentClick}
-                        title="Click para convertir en Tarea Principal"
-                    >
-                        ↳
-                    </span>
-                )}
-                <a className="link-name" onClick={() => onOpen(task.entityName, task.id)} 
-                   style={{ fontWeight: isParent ? 'bold' : 'normal' }}>
-                   {task.nombre}
-                </a>
+                {isParent && <span className="toggle-btn" onClick={() => onToggle(task.id)}>{isCollapsed ? '▶' : '▼'}</span>}
+                {!isParent && <span className="child-indicator unbind-btn" onClick={handleUnparentClick} title="Desvincular">↳</span>}
+                <a className="link-name" onClick={() => onOpen(task.entityName, task.id)} style={{ fontWeight: isParent ? 'bold' : 'normal' }}>{task.nombre}</a>
             </div>
 
-            <div className="gd-cell w-members">
-                <MemberFacepile taskId={task.id} webAPI={webAPI} />
+            <div className="gd-cell w-members"><MemberFacepile taskId={task.id} webAPI={webAPI} /></div>
+
+            <div className="gd-cell w-date">{task.inicio}</div>
+            <div className="gd-cell w-date">{task.fin}</div>
+            
+            {/* --- SELECT MODERNO --- */}
+            <div className="gd-cell w-dep">
+                <select 
+                    className="modern-select" 
+                    value={localDepId} 
+                    onChange={handleDepChange}
+                    title="Seleccionar Dependencia"
+                    // Si el valor local no está en la lista (ej. se borró la tarea), manejamos fallback
+                >
+                    <option value="">--</option>
+                    {availableDependencies.map(opt => (
+                        <option key={opt.id} value={opt.id}>
+                            {opt.nombre}
+                        </option>
+                    ))}
+                    {/* Si tenemos una dependencia asignada pero no está en la lista (ej. filtro circular), la mostramos forzada para no perder el dato visual */}
+                    {localDepId && !availableDependencies.find(x => x.id === localDepId) && (
+                         <option value={localDepId} disabled>
+                             {task.depName || "(Oculta por ciclo)"}
+                         </option>
+                    )}
+                </select>
             </div>
 
-            <div className="gd-cell w-date" title={task.inicio}>{task.inicio}</div>
-            <div className="gd-cell w-date" title={task.fin}>{task.fin}</div>
-            <div className="gd-cell w-dep" title={`Dependencia: ${task.depName}`}>{task.depName}</div>
-            <div className="gd-cell w-num" title="Esfuerzo Estimado">{task.esfuerzo}</div>
-            <div className="gd-cell w-num" title="Horas Imputadas">{task.imputadas}</div>
+            <div className="gd-cell w-num">{task.esfuerzo}</div>
+            <div className="gd-cell w-num">{task.imputadas}</div>
             
             <div className="gd-cell w-prog" title={`Progreso: ${task.progreso}%`}>
-                <div className="prog-bar-container">
-                    <div className="prog-bar-fill" style={{ width: `${task.progreso}%` }}></div>
-                </div>
+                <div className="prog-bar-container"><div className="prog-bar-fill" style={{ width: `${task.progreso}%` }}></div></div>
                 <span className="lbl-percent">{task.progreso}%</span>
             </div>
 
-            <div className="gd-cell w-stat" title={task.estado}>
-                <span className={`pill ${task.estado.toLowerCase().includes('completada') ? 's-done' : 's-pend'}`}>
-                    {task.estado}
-                </span>
+            <div className="gd-cell w-stat">
+                <span className={`pill ${task.estado.toLowerCase().includes('completada') ? 's-done' : 's-pend'}`}>{task.estado}</span>
             </div>
         </div>
     );
@@ -184,7 +201,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         super(props);
         this.state = { collapsedParents: [] };
     }
-
     private toggleParent = (id: string) => {
         this.setState(prevState => {
             const list = prevState.collapsedParents;
@@ -203,9 +219,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="v-tag">v{this.props.version}</div>
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
-                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>
-                        💡 Arrastra para agrupar. Click en ↳ para desagrupar.
-                    </span>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra para agrupar. Click en ↳ para desagrupar.</span>
                 </div>
                 
                 <div className="grid-header">
@@ -231,7 +245,8 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                             onOpen={this.props.onOpenTask}
                             webAPI={this.props.context.webAPI}
                             onDropAction={this.props.onReparentTask}
-                            onUnparentAction={this.props.onUnparentTask} // Pasamos la función
+                            onUnparentAction={this.props.onUnparentTask}
+                            onUpdateDep={this.props.onUpdateDependency}
                         />
                     ))}
                 </div>
