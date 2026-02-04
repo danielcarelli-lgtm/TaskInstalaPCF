@@ -14,7 +14,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-new { background-color: #0078d4; color: white; border: none; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; }
 .btn-new:hover { background-color: #106ebe; }
 
-/* NUEVO BOTON EXCEL */
+/* BOTON EXCEL */
 .btn-excel { background-color: #107c10; color: white; border: none; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; margin-left: 8px; }
 .btn-excel:hover { background-color: #0b5a0b; }
 
@@ -41,33 +41,25 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .w-members { width: 80px; display: flex; align-items: center; }
 .w-date { width: 110px; text-align: center; } 
 
-/* SELECT MODERNO (INVISIBLE) */
+/* SELECT MODERNO */
 .w-dep { width: 120px; color: #666; position: relative; } 
 .modern-select {
     width: 100%;
     height: 100%;
     border: none;
     background-color: transparent;
-    color: #555; /* Un poco más oscuro para legibilidad */
+    color: #555; 
     font-family: inherit;
     font-size: 11px;
     cursor: pointer;
     outline: none;
-    appearance: none; /* Quita el estilo nativo feo */
+    appearance: none; 
     -webkit-appearance: none;
-    padding-right: 15px; /* Espacio para una flechita custom si quisieras, o invisible */
+    padding-right: 15px; 
 }
 
-/* Hack para mostrar flechita solo en hover si se desea, o dejarlo limpio */
-.modern-select:hover {
-    background-color: #e1dfdd; /* Feedback ligero */
-    color: #000;
-}
-.modern-select option {
-    background-color: #fff;
-    color: #333;
-    padding: 5px;
-}
+.modern-select:hover { background-color: #e1dfdd; color: #000; }
+.modern-select option { background-color: #fff; color: #333; padding: 5px; }
 
 .w-num { width: 70px; text-align: right; }
 .w-prog { width: 110px; display: flex; align-items: center; }

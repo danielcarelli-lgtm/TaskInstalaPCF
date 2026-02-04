@@ -115,7 +115,7 @@ const TaskRow = (props: {
         onDropAction(draggedId, task.id);
     };
     
-    // --- CAMBIO: SIN CARTEL DE CONFIRMACIÓN AL DESAGRUPAR ---
+    // --- SIN CARTEL DE CONFIRMACIÓN AL DESAGRUPAR ---
     const handleUnparentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onUnparentAction(task.id);
@@ -166,7 +166,6 @@ const TaskRow = (props: {
                     value={localDepId} 
                     onChange={handleDepChange}
                     title="Seleccionar Dependencia"
-                    // Si el valor local no está en la lista (ej. se borró la tarea), manejamos fallback
                 >
                     <option value="">--</option>
                     {availableDependencies.map(opt => (
@@ -174,7 +173,6 @@ const TaskRow = (props: {
                             {opt.nombre}
                         </option>
                     ))}
-                    {/* Si tenemos una dependencia asignada pero no está en la lista (ej. filtro circular), la mostramos forzada para no perder el dato visual */}
                     {localDepId && !availableDependencies.find(x => x.id === localDepId) && (
                          <option value={localDepId} disabled>
                              {task.depName || "(Oculta por ciclo)"}
@@ -217,12 +215,9 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             return;
         }
 
-        // 1. Definir cabeceras
         const headers = ["#", "ID Tarea", "Nombre", "Inicio", "Fin", "Dependencia", "Esfuerzo", "Imputadas", "Progreso", "Estado"];
 
-        // 2. Construir filas (CAMBIO: Usamos punto y coma para separar)
         const rows = tasks.map(t => {
-            // Escapar comillas dobles para CSV
             const safeName = t.nombre ? `"${t.nombre.replace(/"/g, '""')}"` : "";
             const safeDep = t.depName ? `"${t.depName.replace(/"/g, '""')}"` : "";
             const safeState = t.estado ? `"${t.estado.replace(/"/g, '""')}"` : "";
@@ -241,17 +236,15 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             ];
         });
 
-        // 3. Unir todo en formato CSV (CAMBIO: Join con ;)
+        // Separador ;
         const csvContent = [
             headers.join(";"), 
             ...rows.map(row => row.join(";"))
         ].join("\n");
 
-        // 4. Crear Blob con BOM para UTF-8 (para que Excel lea ñ/tildes bien)
         const bom = "\uFEFF";
         const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
         
-        // 5. Descargar
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
@@ -273,7 +266,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="v-tag">v{this.props.version}</div>
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
-                    {/* BOTON EXCEL AÑADIDO */}
                     <button className="btn-excel" onClick={this.handleExportExcel} title="Descargar CSV">📊 Excel</button>
                     <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra para agrupar. Click en ↳ para desagrupar.</span>
                 </div>

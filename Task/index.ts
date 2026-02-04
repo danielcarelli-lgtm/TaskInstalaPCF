@@ -64,10 +64,36 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.2",
+            version: "1.9.3",
             context: context, 
+            // === MODIFICACION: Abrir en Modal ===
             onOpenTask: (etn, id) => {
-                void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });
+                // Usamos any para acceder a navigateTo que soporta target: 2 (Dialog)
+                // Esto abre una ventana modal centrada
+                const nav = context.navigation as any;
+                if (nav.navigateTo) {
+                    const pageInput = {
+                        pageType: "entityrecord",
+                        entityName: etn,
+                        entityId: id
+                    };
+                    const navOptions = {
+                        target: 2, // 2 = Modal Dialog
+                        position: 1, // 1 = Center
+                        width: { value: 70, unit: "%" },
+                        height: { value: 80, unit: "%" }
+                    };
+                    nav.navigateTo(pageInput, navOptions).then(
+                        () => { 
+                            // Refrescamos el grid al cerrar el modal por si hubo cambios
+                            ds.refresh(); 
+                        },
+                        (err: any) => { console.error("Error opening modal", err); }
+                    );
+                } else {
+                    // Fallback para entornos antiguos
+                    void context.navigation.openForm({ entityName: etn, entityId: id });
+                }
             },
             onCreateTask: () => {
                 const pageContext = context.mode as any;
