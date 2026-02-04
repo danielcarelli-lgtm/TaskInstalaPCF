@@ -64,7 +64,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.8.2",
+            version: "1.9.2",
             context: context, 
             onOpenTask: (etn, id) => {
                 void context.navigation.openForm({ entityName: etn, entityId: id }, { target: "2", width: "800", height: "600" });

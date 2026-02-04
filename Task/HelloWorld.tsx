@@ -114,9 +114,11 @@ const TaskRow = (props: {
         if (allTasks.some(t => t.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
         onDropAction(draggedId, task.id);
     };
+    
+    // --- CAMBIO: SIN CARTEL DE CONFIRMACIÓN AL DESAGRUPAR ---
     const handleUnparentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm(`¿Convertir "${task.nombre}" en Principal?`)) onUnparentAction(task.id);
+        onUnparentAction(task.id);
     };
 
     // --- LOGICA DEPENDENCIA EDITABLE ---
@@ -208,6 +210,58 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         });
     }
 
+    private handleExportExcel = () => {
+        const { tasks } = this.props;
+        if (!tasks || tasks.length === 0) {
+            alert("No hay tareas para exportar.");
+            return;
+        }
+
+        // 1. Definir cabeceras
+        const headers = ["#", "ID Tarea", "Nombre", "Inicio", "Fin", "Dependencia", "Esfuerzo", "Imputadas", "Progreso", "Estado"];
+
+        // 2. Construir filas (CAMBIO: Usamos punto y coma para separar)
+        const rows = tasks.map(t => {
+            // Escapar comillas dobles para CSV
+            const safeName = t.nombre ? `"${t.nombre.replace(/"/g, '""')}"` : "";
+            const safeDep = t.depName ? `"${t.depName.replace(/"/g, '""')}"` : "";
+            const safeState = t.estado ? `"${t.estado.replace(/"/g, '""')}"` : "";
+
+            return [
+                t.virtualNro.toFixed(2),
+                t.idTarea,
+                safeName,
+                t.inicio,
+                t.fin,
+                safeDep,
+                t.esfuerzo,
+                t.imputadas,
+                `${t.progreso}%`,
+                safeState
+            ];
+        });
+
+        // 3. Unir todo en formato CSV (CAMBIO: Join con ;)
+        const csvContent = [
+            headers.join(";"), 
+            ...rows.map(row => row.join(";"))
+        ].join("\n");
+
+        // 4. Crear Blob con BOM para UTF-8 (para que Excel lea ñ/tildes bien)
+        const bom = "\uFEFF";
+        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        
+        // 5. Descargar
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const dateStr = new Date().toISOString().slice(0, 10);
+        link.setAttribute("download", `Tareas_Export_${dateStr}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     public render(): React.ReactNode {
         const visibleTasks = this.props.tasks.filter(t => {
             if (!t.parentId) return true;
@@ -219,6 +273,8 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="v-tag">v{this.props.version}</div>
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
+                    {/* BOTON EXCEL AÑADIDO */}
+                    <button className="btn-excel" onClick={this.handleExportExcel} title="Descargar CSV">📊 Excel</button>
                     <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra para agrupar. Click en ↳ para desagrupar.</span>
                 </div>
                 
