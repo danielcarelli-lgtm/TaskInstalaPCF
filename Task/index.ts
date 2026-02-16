@@ -39,6 +39,8 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 nombre: record.getFormattedValue("sec_name"),
                 inicio: record.getFormattedValue("sec_inicio"),
                 fin: record.getFormattedValue("sec_fin"),
+                rawInicio: record.getValue("sec_inicio") ? new Date(record.getValue("sec_inicio")) : null,
+                rawFin: record.getValue("sec_fin") ? new Date(record.getValue("sec_fin")) : null,
                 esfuerzo: record.getFormattedValue("sec_esfuerzoestimado"),
                 imputadas: record.getFormattedValue("sec_horasimputadas"),
                 progreso: parseInt(record.getFormattedValue("sec_progreso")) || 0,
@@ -64,12 +66,9 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.3",
+            version: "1.9.13",
             context: context, 
-            // === MODIFICACION: Abrir en Modal ===
             onOpenTask: (etn, id) => {
-                // Usamos any para acceder a navigateTo que soporta target: 2 (Dialog)
-                // Esto abre una ventana modal centrada
                 const nav = context.navigation as any;
                 if (nav.navigateTo) {
                     const pageInput = {
@@ -78,21 +77,22 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                         entityId: id
                     };
                     const navOptions = {
-                        target: 2, // 2 = Modal Dialog
-                        position: 1, // 1 = Center
+                        target: 2, 
+                        position: 1, 
                         width: { value: 70, unit: "%" },
                         height: { value: 80, unit: "%" }
                     };
                     nav.navigateTo(pageInput, navOptions).then(
-                        () => { 
-                            // Refrescamos el grid al cerrar el modal por si hubo cambios
-                            ds.refresh(); 
-                        },
+                        () => { ds.refresh(); },
                         (err: any) => { console.error("Error opening modal", err); }
                     );
                 } else {
-                    // Fallback para entornos antiguos
-                    void context.navigation.openForm({ entityName: etn, entityId: id });
+                    void context.navigation.openForm({ entityName: etn, entityId: id }).then(
+                        () => { 
+                            ds.refresh(); 
+                        }, 
+                        (err: any) => { console.error("Error opening modal", err); }
+                    );
                 }
             },
             onCreateTask: () => {
@@ -107,7 +107,13 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 }
                 void context.navigation.openForm({ entityName: "sec_tarea", useQuickCreateForm: true }, formParams);
             },
-            onUpdateProgreso: (id, val) => { },
+            onUpdateProgreso: (id, val) => { 
+                const data = { "sec_progreso": val };
+                context.webAPI.updateRecord("sec_tarea", id, data).then(
+                    () => { ds.refresh(); },
+                    (err) => { context.navigation.openErrorDialog({ message: "Error actualizando progreso: " + err.message }); }
+                );
+            },
             onReparentTask: (childId, newParentId) => {
                 const data = { "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})` };
                 context.webAPI.updateRecord("sec_tarea", childId, data).then(
@@ -123,20 +129,34 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                 );
             },
             onUpdateDependency: (taskId, dependencyId) => {
-                console.log(`Update Dep: ${taskId} depends on ${dependencyId}`);
                 let data: any = {};
                 if (dependencyId) {
-                    // ID limpio para la API
                     const cleanId = dependencyId.replace(/[{}]/g, '');
                     data["sec_dependenciaid@odata.bind"] = `/sec_tareas(${cleanId})`;
                 } else {
                     data["sec_dependenciaid"] = null;
                 }
-                // No llamamos a ds.refresh() inmediatamente aquí para evitar que sobrescriba el estado local
-                // React mantendrá el valor seleccionado visualmente.
                 context.webAPI.updateRecord("sec_tarea", taskId, data).then(
                     () => { console.log("Dependencia guardada OK"); },
                     (err) => { context.navigation.openErrorDialog({ message: "Error guardando dependencia: " + err.message }); }
+                );
+            },
+            onUpdateDates: (id, start, end) => {
+                const formatDate = (d: Date) => {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                };
+
+                const data = {
+                    "sec_inicio": formatDate(start),
+                    "sec_fin": formatDate(end)
+                };
+
+                context.webAPI.updateRecord("sec_tarea", id, data).then(
+                    () => { ds.refresh(); },
+                    (err) => { context.navigation.openErrorDialog({ message: "Error actualizando fechas: " + err.message }); }
                 );
             }
         };

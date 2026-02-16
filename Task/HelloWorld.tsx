@@ -5,9 +5,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
-/* eslint-disable promise/catch-or-return */
-/* eslint-disable promise/always-return */
 import * as React from 'react';
+import { Gantt, Task as GanttTask, ViewMode } from 'gantt-task-react';
+import "gantt-task-react/dist/index.css";
 
 export interface ITaskItem {
     id: string; originalId?: string; idTarea: string; nombre: string; inicio: string;
@@ -16,6 +16,8 @@ export interface ITaskItem {
     depName?: string; depId?: string; 
     entityName: string;
     virtualNro: number; 
+    rawInicio: Date | null; 
+    rawFin: Date | null;
 }
 
 export interface IHelloWorldProps { 
@@ -28,10 +30,13 @@ export interface IHelloWorldProps {
     onReparentTask: (childId: string, newParentId: string) => void;
     onUnparentTask: (childId: string) => void;
     onUpdateDependency: (taskId: string, dependencyId: string | null) => void;
+    onUpdateDates: (id: string, start: Date, end: Date) => void;
 }
 
 interface IHelloWorldState {
     collapsedParents: string[];
+    activeView: 'grid' | 'gantt';
+    ganttViewMode: ViewMode;
 }
 
 // === FACEPILE ===
@@ -124,9 +129,7 @@ const TaskRow = (props: {
     // --- LOGICA DEPENDENCIA EDITABLE ---
     const handleDepChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
-        // 1. Actualizamos visualmente YA (sin esperar a Dynamics)
         setLocalDepId(val);
-        // 2. Lanzamos la petición de guardado
         onUpdateDep(task.id, val === "" ? null : val);
     };
 
@@ -159,7 +162,6 @@ const TaskRow = (props: {
             <div className="gd-cell w-date">{task.inicio}</div>
             <div className="gd-cell w-date">{task.fin}</div>
             
-            {/* --- SELECT MODERNO --- */}
             <div className="gd-cell w-dep">
                 <select 
                     className="modern-select" 
@@ -199,8 +201,13 @@ const TaskRow = (props: {
 export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldState> {
     constructor(props: IHelloWorldProps) {
         super(props);
-        this.state = { collapsedParents: [] };
+        this.state = { 
+            collapsedParents: [],
+            activeView: 'grid',
+            ganttViewMode: ViewMode.Day
+        };
     }
+    
     private toggleParent = (id: string) => {
         this.setState(prevState => {
             const list = prevState.collapsedParents;
@@ -236,7 +243,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             ];
         });
 
-        // Separador ;
         const csvContent = [
             headers.join(";"), 
             ...rows.map(row => row.join(";"))
@@ -256,48 +262,232 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
     }
 
     public render(): React.ReactNode {
-        const visibleTasks = this.props.tasks.filter(t => {
+        const { tasks } = this.props;
+        const { activeView, ganttViewMode } = this.state;
+
+        const visibleTasks = tasks.filter(t => {
             if (!t.parentId) return true;
             return !this.state.collapsedParents.includes(t.parentId);
         });
 
+        // ==========================================
+        // CONFIGURACIONES EXCLUSIVAS DEL GANTT
+        // ==========================================
+        let ganttTasks: GanttTask[] = [];
+        if (activeView === 'gantt' && visibleTasks.length > 0) {
+            ganttTasks = visibleTasks.map(t => {
+                const start = t.rawInicio ? new Date(t.rawInicio) : new Date();
+                const end = t.rawFin ? new Date(t.rawFin) : new Date(start.getTime() + 24 * 60 * 60 * 1000);
+                
+                if (end < start) end.setTime(start.getTime() + 24 * 60 * 60 * 1000);
+
+                const isParent = Number.isInteger(t.virtualNro) && tasks.some(child => child.parentId === t.id);
+
+                return {
+                    start: start,
+                    end: end,
+                    name: t.nombre || "Sin nombre",
+                    id: t.id,
+                    type: isParent ? 'project' : 'task',
+                    progress: t.progreso,
+                    isDisabled: false,
+                    project: t.parentId, 
+                    dependencies: t.depId ? [t.depId] : undefined,
+                    styles: {
+                        progressColor: '#107c10',
+                        progressSelectedColor: '#0b5a0b',
+                        backgroundColor: isParent ? '#c7e0f4' : '#deecf9',
+                        backgroundSelectedColor: '#a6c8e6',
+                    }
+                };
+            });
+        }
+
+        const GanttCustomHeader: React.FC<any> = ({ headerHeight, fontFamily, fontSize }) => (
+            <div className="grid-header" style={{ height: headerHeight, fontFamily, fontSize, borderBottom: '1px solid #ccc' }}>
+                <div className="gh-cell" style={{ flexGrow: 2, minWidth: '180px', paddingLeft: '10px' }}>NOMBRE</div>
+                <div className="gh-cell w-date">INICIO</div>
+                <div className="gh-cell w-date">FIN</div>
+            </div>
+        );
+
+        const GanttCustomTable: React.FC<any> = ({ rowHeight, tasks: ganttViewTasks, fontFamily, fontSize }) => {
+            const [dragOverId, setDragOverId] = React.useState<string | null>(null);
+
+            const formatGanttDate = (date: Date) => {
+                const d = String(date.getDate()).padStart(2, '0');
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const y = date.getFullYear();
+                return `${d}/${m}/${y}`;
+            };
+
+            return (
+                <div style={{ fontFamily, fontSize }}>
+                    {ganttViewTasks.map((t: GanttTask) => {
+                        const isProj = t.type === 'project';
+                        const originalTask = this.props.tasks.find(x => x.id === t.id);
+                        const isChild = originalTask ? !!originalTask.parentId : false;
+
+                        const handleDragStart = (e: React.DragEvent) => {
+                            e.dataTransfer.setData("text/plain", t.id);
+                            e.dataTransfer.effectAllowed = "move";
+                        };
+                        const handleDragOver = (e: React.DragEvent) => { 
+                            e.preventDefault(); 
+                            if (dragOverId !== t.id) setDragOverId(t.id); 
+                        };
+                        const handleDragLeave = () => { 
+                            if (dragOverId === t.id) setDragOverId(null); 
+                        };
+                        const handleDrop = (e: React.DragEvent) => {
+                            e.preventDefault(); 
+                            setDragOverId(null);
+                            const draggedId = e.dataTransfer.getData("text/plain");
+                            if (!draggedId || draggedId === t.id) return;
+                            if (originalTask && originalTask.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
+                            if (this.props.tasks.some(x => x.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
+                            this.props.onReparentTask(draggedId, t.id);
+                        };
+
+                        const handleUnparentClick = (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            this.props.onUnparentTask(t.id);
+                        };
+
+                        return (
+                            <div 
+                                className={`grid-row ${isProj ? 'row-parent' : 'row-child'} ${dragOverId === t.id ? 'row-drag-over' : ''}`} 
+                                style={{ height: rowHeight }} 
+                                key={t.id}
+                                draggable="true"
+                                onDragStart={handleDragStart}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                            >
+                                <div className="gd-cell" style={{ flexGrow: 2, minWidth: '180px', paddingLeft: isChild ? '30px' : '10px', display: 'flex', alignItems: 'center' }} title={t.name}>
+                                    {isChild && <span className="child-indicator unbind-btn" onClick={handleUnparentClick} title="Desvincular">↳</span>}
+                                    <a className="link-name" onClick={() => { if(originalTask) this.props.onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: isProj ? 'bold' : 'normal' }}>
+                                        {t.name}
+                                    </a>
+                                </div>
+                                <div className="gd-cell w-date">{formatGanttDate(t.start)}</div>
+                                <div className="gd-cell w-date">{formatGanttDate(t.end)}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
         return (
             <div className="pcf-container">
                 <div className="v-tag">v{this.props.version}</div>
+                
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
                     <button className="btn-excel" onClick={this.handleExportExcel} title="Descargar CSV">📊 Excel</button>
                     <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra para agrupar. Click en ↳ para desagrupar.</span>
+                    
+                    {/* SELECTOR DE VISTAS */}
+                    <div className="view-toggle-container">
+                        <button 
+                            className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} 
+                            onClick={() => this.setState({ activeView: 'grid' })}
+                        >
+                            Lista
+                        </button>
+                        <button 
+                            className={`btn-view ${activeView === 'gantt' ? 'active' : ''}`} 
+                            onClick={() => this.setState({ activeView: 'gantt' })}
+                        >
+                            Gantt
+                        </button>
+                    </div>
+
+                    {/* SELECTOR DE ZOOM (Solo visible en Gantt) */}
+                    {activeView === 'gantt' && (
+                        <div className="zoom-toggle-container">
+                            <button 
+                                className={`btn-zoom ${ganttViewMode === ViewMode.Day ? 'active' : ''}`} 
+                                onClick={() => this.setState({ ganttViewMode: ViewMode.Day })}
+                            >Días</button>
+                            <button 
+                                className={`btn-zoom ${ganttViewMode === ViewMode.Week ? 'active' : ''}`} 
+                                onClick={() => this.setState({ ganttViewMode: ViewMode.Week })}
+                            >Semanas</button>
+                            <button 
+                                className={`btn-zoom ${ganttViewMode === ViewMode.Month ? 'active' : ''}`} 
+                                onClick={() => this.setState({ ganttViewMode: ViewMode.Month })}
+                            >Meses</button>
+                        </div>
+                    )}
                 </div>
                 
-                <div className="grid-header">
-                    <div className="gh-cell w-nro">#</div>
-                    <div className="gh-cell w-id">ID</div>
-                    <div className="gh-cell w-name">NOMBRE</div>
-                    <div className="gh-cell w-members">EQUIPO</div>
-                    <div className="gh-cell w-date">INICIO</div>
-                    <div className="gh-cell w-date">FIN</div>
-                    <div className="gh-cell w-dep">DEPENDENCIA</div>
-                    <div className="gh-cell w-num">ESFUERZO</div>
-                    <div className="gh-cell w-num">IMPUTADAS</div>
-                    <div className="gh-cell w-prog">PROGRESO</div>
-                    <div className="gh-cell w-stat">ESTADO</div>
-                </div>
+                {/* VISTA 1: LISTA (GRID) ORIGINAL */}
+                {activeView === 'grid' && (
+                    <>
+                        <div className="grid-header">
+                            <div className="gh-cell w-nro">#</div>
+                            <div className="gh-cell w-id">ID</div>
+                            <div className="gh-cell w-name">NOMBRE</div>
+                            <div className="gh-cell w-members">EQUIPO</div>
+                            <div className="gh-cell w-date">INICIO</div>
+                            <div className="gh-cell w-date">FIN</div>
+                            <div className="gh-cell w-dep">DEPENDENCIA</div>
+                            <div className="gh-cell w-num">ESFUERZO</div>
+                            <div className="gh-cell w-num">IMPUTADAS</div>
+                            <div className="gh-cell w-prog">PROGRESO</div>
+                            <div className="gh-cell w-stat">ESTADO</div>
+                        </div>
 
-                <div className="grid-body">
-                    {visibleTasks.map((task) => (
-                        <TaskRow key={task.id} task={task} 
-                            allTasks={this.props.tasks} 
-                            isCollapsed={this.state.collapsedParents.includes(task.id)}
-                            onToggle={this.toggleParent}
-                            onOpen={this.props.onOpenTask}
-                            webAPI={this.props.context.webAPI}
-                            onDropAction={this.props.onReparentTask}
-                            onUnparentAction={this.props.onUnparentTask}
-                            onUpdateDep={this.props.onUpdateDependency}
-                        />
-                    ))}
-                </div>
+                        <div className="grid-body">
+                            {visibleTasks.map((task) => (
+                                <TaskRow key={task.id} task={task} 
+                                    allTasks={this.props.tasks} 
+                                    isCollapsed={this.state.collapsedParents.includes(task.id)}
+                                    onToggle={this.toggleParent}
+                                    onOpen={this.props.onOpenTask}
+                                    webAPI={this.props.context.webAPI}
+                                    onDropAction={this.props.onReparentTask}
+                                    onUnparentAction={this.props.onUnparentTask}
+                                    onUpdateDep={this.props.onUpdateDependency}
+                                />
+                            ))}
+                        </div>
+                    </>
+                )}
+
+                {/* VISTA 2: GANTT HOMOLOGADO */}
+                {activeView === 'gantt' && (
+                    <div className="gantt-container">
+                        {ganttTasks.length > 0 ? (
+                            <Gantt
+                                tasks={ganttTasks}
+                                viewMode={ganttViewMode}
+                                onDateChange={(task: GanttTask) => this.props.onUpdateDates(task.id, task.start, task.end)}
+                                onProgressChange={(task: GanttTask) => this.props.onUpdateProgreso(task.id, task.progress)}
+                                onDoubleClick={(task: GanttTask) => {
+                                    const originalTask = this.props.tasks.find(t => t.id === task.id);
+                                    if (originalTask) this.props.onOpenTask(originalTask.entityName, originalTask.id);
+                                }}
+                                rowHeight={28}
+                                listCellWidth="400px"
+                                columnWidth={60}
+                                locale="es"
+                                fontFamily="'Segoe UI', sans-serif"
+                                fontSize="12px"
+                                TaskListHeader={GanttCustomHeader}
+                                TaskListTable={GanttCustomTable}
+                            />
+                        ) : (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                No hay datos de fechas válidas para mostrar en el Gantt.
+                            </div>
+                        )}
+                    </div>
+                )}
+
             </div>
         );
     }
