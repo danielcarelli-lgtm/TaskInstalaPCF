@@ -9,6 +9,9 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
     public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
         const ds = context.parameters.sampleDataSet;
         
+        const depFechasRaw = context.parameters.dependencia_fechas?.raw;
+        const dependFechas = depFechasRaw !== false; 
+        
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
             
@@ -66,7 +69,8 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.15",
+            version: "1.9.18",
+            dependenciaFechas: dependFechas, 
             context: context, 
             onOpenTask: (etn, id) => {
                 const nav = context.navigation as any;

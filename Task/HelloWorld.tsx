@@ -23,6 +23,7 @@ export interface ITaskItem {
 export interface IHelloWorldProps { 
     tasks: ITaskItem[]; 
     version: string;
+    dependenciaFechas: boolean;
     context: ComponentFramework.Context<any>; 
     onOpenTask: (etn: string, id: string) => void;
     onCreateTask: () => void;
@@ -259,8 +260,32 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         document.body.removeChild(link);
     }
 
+    // Calcula dinámicamente las fechas min/max de los hijos para un padre
+    private getComputedDates = (parentId: string, allTasks: ITaskItem[]): { start: Date, end: Date } | null => {
+        const children = allTasks.filter(c => c.parentId === parentId);
+        if (children.length === 0) return null;
+        
+        let minStart = new Date(8640000000000000);
+        let maxEnd = new Date(-8640000000000000);
+        let hasValid = false;
+
+        children.forEach(c => {
+            // SOLUCIÓN ESLINT: Cambiado let por const
+            const cStart = c.rawInicio ? new Date(c.rawInicio) : new Date();
+            const cEnd = c.rawFin ? new Date(c.rawFin) : new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
+            
+            if (cEnd < cStart) cEnd.setTime(cStart.getTime() + 24 * 60 * 60 * 1000);
+
+            if (cStart < minStart) minStart = cStart;
+            if (cEnd > maxEnd) maxEnd = cEnd;
+            hasValid = true;
+        });
+
+        return hasValid ? { start: minStart, end: maxEnd } : null;
+    };
+
     public render(): React.ReactNode {
-        const { tasks } = this.props;
+        const { tasks, dependenciaFechas } = this.props;
         const { activeView, ganttViewMode } = this.state;
 
         const visibleTasks = tasks.filter(t => {
@@ -274,30 +299,41 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         let ganttTasks: GanttTask[] = [];
         if (activeView === 'gantt' && visibleTasks.length > 0) {
             ganttTasks = visibleTasks.map(t => {
-                const start = t.rawInicio ? new Date(t.rawInicio) : new Date();
-                const end = t.rawFin ? new Date(t.rawFin) : new Date(start.getTime() + 24 * 60 * 60 * 1000);
-                
+                let start = t.rawInicio ? new Date(t.rawInicio) : new Date();
+                let end = t.rawFin ? new Date(t.rawFin) : new Date(start.getTime() + 24 * 60 * 60 * 1000);
                 if (end < start) end.setTime(start.getTime() + 24 * 60 * 60 * 1000);
 
-                // --- LÓGICA DE DIFERENCIACIÓN VISUAL ---
-                const isRoot = !t.parentId; // Es una tarea principal (sin padre)
-                const hasChildren = tasks.some(child => child.parentId === t.id); // Tiene subtareas
+                const isRoot = !t.parentId; 
+                const hasChildren = tasks.some(child => child.parentId === t.id); 
+                
+                // Si dependenciaFechas es FALSO, las tareas principales son tipo 'task' y se pueden arrastrar libremente.
+                const itemType = (isRoot && hasChildren && dependenciaFechas) ? 'project' : 'task';
 
-                // Solo damos forma de "corchete" (project) si es principal Y tiene hijas.
-                const itemType = (isRoot && hasChildren) ? 'project' : 'task';
+                // Si tiene hijas y la configuración está activa, calculamos dinámicamente sus fechas
+                if (hasChildren && dependenciaFechas) {
+                    const computed = this.getComputedDates(t.id, tasks);
+                    if (computed) {
+                        start = computed.start;
+                        end = computed.end;
+                    }
+                }
 
-                // Colores base para Tareas Hijas (Verde)
-                let progColor = '#107c10'; 
-                let progSelColor = '#0b5a0b';
-                let bgColor = '#deecf9';
-                let bgSelColor = '#a6c8e6';
+                // Paleta de Colores Solicitada
+                let progColor = '#031F30';  // Primarias (sin hijas)
+                let progSelColor = '#021520';
+                let bgColor = '#b5c8d6';
+                let bgSelColor = '#94aabf';
 
-                // Si es una tarea principal (tenga o no hijas), la pintamos de Azul para diferenciarla visualmente.
-                if (isRoot) {
-                    progColor = '#0078d4'; 
-                    progSelColor = '#005a9e';
-                    bgColor = '#c7e0f4';
-                    bgSelColor = '#9dc6eb';
+                if (isRoot && hasChildren) {
+                    progColor = '#42638C';  // Corchetes (padres con hijas)
+                    progSelColor = '#2b4463';
+                    bgColor = '#c7d1dc';
+                    bgSelColor = '#a8b8ca';
+                } else if (!isRoot) {
+                    progColor = '#55419E';  // Secundarias (hijas)
+                    progSelColor = '#3b2c6e';
+                    bgColor = '#dcd9eb';
+                    bgSelColor = '#c2bcde';
                 }
 
                 return {
@@ -396,7 +432,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             );
         };
 
-        // --- TOOLTIP PERSONALIZADO EN ESPAÑOL ---
         const GanttCustomTooltip: React.FC<any> = ({ task, fontFamily, fontSize }) => {
             const formatGanttDate = (date: Date) => {
                 const d = String(date.getDate()).padStart(2, '0');
