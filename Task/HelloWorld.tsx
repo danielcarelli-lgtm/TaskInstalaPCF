@@ -96,10 +96,8 @@ const TaskRow = (props: {
     const isParent = Number.isInteger(task.virtualNro);
     const [isDragOver, setIsDragOver] = React.useState(false);
     
-    // --- ESTADO LOCAL PARA DEPENDENCIA (PERSISTENCIA VISUAL) ---
-    const [localDepId, setLocalDepId] = React.useState(task.depId || "");
-
     // Sincronizar si cambia desde fuera (ej. carga inicial)
+    const [localDepId, setLocalDepId] = React.useState(task.depId || "");
     React.useEffect(() => {
         setLocalDepId(task.depId || "");
     }, [task.depId]);
@@ -120,13 +118,13 @@ const TaskRow = (props: {
         onDropAction(draggedId, task.id);
     };
     
-    // --- SIN CARTEL DE CONFIRMACIÓN AL DESAGRUPAR ---
+    // --- DESAGRUPAR ---
     const handleUnparentClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onUnparentAction(task.id);
     };
 
-    // --- LOGICA DEPENDENCIA EDITABLE ---
+    // --- DEPENDENCIA ---
     const handleDepChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
         setLocalDepId(val);
@@ -281,23 +279,42 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 
                 if (end < start) end.setTime(start.getTime() + 24 * 60 * 60 * 1000);
 
-                const isParent = Number.isInteger(t.virtualNro) && tasks.some(child => child.parentId === t.id);
+                // --- LÓGICA DE DIFERENCIACIÓN VISUAL ---
+                const isRoot = !t.parentId; // Es una tarea principal (sin padre)
+                const hasChildren = tasks.some(child => child.parentId === t.id); // Tiene subtareas
+
+                // Solo damos forma de "corchete" (project) si es principal Y tiene hijas.
+                const itemType = (isRoot && hasChildren) ? 'project' : 'task';
+
+                // Colores base para Tareas Hijas (Verde)
+                let progColor = '#107c10'; 
+                let progSelColor = '#0b5a0b';
+                let bgColor = '#deecf9';
+                let bgSelColor = '#a6c8e6';
+
+                // Si es una tarea principal (tenga o no hijas), la pintamos de Azul para diferenciarla visualmente.
+                if (isRoot) {
+                    progColor = '#0078d4'; 
+                    progSelColor = '#005a9e';
+                    bgColor = '#c7e0f4';
+                    bgSelColor = '#9dc6eb';
+                }
 
                 return {
                     start: start,
                     end: end,
                     name: t.nombre || "Sin nombre",
                     id: t.id,
-                    type: isParent ? 'project' : 'task',
+                    type: itemType,
                     progress: t.progreso,
                     isDisabled: false,
                     project: t.parentId, 
                     dependencies: t.depId ? [t.depId] : undefined,
                     styles: {
-                        progressColor: '#107c10',
-                        progressSelectedColor: '#0b5a0b',
-                        backgroundColor: isParent ? '#c7e0f4' : '#deecf9',
-                        backgroundSelectedColor: '#a6c8e6',
+                        progressColor: progColor,
+                        progressSelectedColor: progSelColor,
+                        backgroundColor: bgColor,
+                        backgroundSelectedColor: bgSelColor,
                     }
                 };
             });
@@ -324,7 +341,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             return (
                 <div style={{ fontFamily, fontSize }}>
                     {ganttViewTasks.map((t: GanttTask) => {
-                        const isProj = t.type === 'project';
                         const originalTask = this.props.tasks.find(x => x.id === t.id);
                         const isChild = originalTask ? !!originalTask.parentId : false;
 
@@ -356,7 +372,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
                         return (
                             <div 
-                                className={`grid-row ${isProj ? 'row-parent' : 'row-child'} ${dragOverId === t.id ? 'row-drag-over' : ''}`} 
+                                className={`grid-row ${!isChild ? 'row-parent' : 'row-child'} ${dragOverId === t.id ? 'row-drag-over' : ''}`} 
                                 style={{ height: rowHeight }} 
                                 key={t.id}
                                 draggable="true"
@@ -367,7 +383,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                             >
                                 <div className="gd-cell" style={{ flexGrow: 2, minWidth: '180px', paddingLeft: isChild ? '30px' : '10px', display: 'flex', alignItems: 'center' }} title={t.name}>
                                     {isChild && <span className="child-indicator unbind-btn" onClick={handleUnparentClick} title="Desvincular">↳</span>}
-                                    <a className="link-name" onClick={() => { if(originalTask) this.props.onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: isProj ? 'bold' : 'normal' }}>
+                                    <a className="link-name" onClick={() => { if(originalTask) this.props.onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: !isChild ? 'bold' : 'normal' }}>
                                         {t.name}
                                     </a>
                                 </div>
@@ -376,6 +392,35 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                             </div>
                         );
                     })}
+                </div>
+            );
+        };
+
+        // --- TOOLTIP PERSONALIZADO EN ESPAÑOL ---
+        const GanttCustomTooltip: React.FC<any> = ({ task, fontFamily, fontSize }) => {
+            const formatGanttDate = (date: Date) => {
+                const d = String(date.getDate()).padStart(2, '0');
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const y = date.getFullYear();
+                return `${d}/${m}/${y}`;
+            };
+            return (
+                <div style={{ 
+                    padding: '12px', 
+                    backgroundColor: '#fff', 
+                    borderRadius: '4px', 
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)', 
+                    fontFamily, 
+                    fontSize, 
+                    border: '1px solid #e0e0e0',
+                    minWidth: '150px'
+                }}>
+                    <div style={{ fontWeight: 600, color: '#323130', marginBottom: '8px', borderBottom: '1px solid #f3f2f1', paddingBottom: '4px' }}>
+                        {task.name}
+                    </div>
+                    <div style={{ color: '#605e5c', marginBottom: '4px' }}><strong>Inicio:</strong> {formatGanttDate(task.start)}</div>
+                    <div style={{ color: '#605e5c', marginBottom: '4px' }}><strong>Fin:</strong> {formatGanttDate(task.end)}</div>
+                    <div style={{ color: '#605e5c' }}><strong>Progreso:</strong> {task.progress}%</div>
                 </div>
             );
         };
@@ -479,6 +524,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                                 fontSize="12px"
                                 TaskListHeader={GanttCustomHeader}
                                 TaskListTable={GanttCustomTable}
+                                TooltipContent={GanttCustomTooltip}
                             />
                         ) : (
                             <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>

@@ -66,7 +66,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.13",
+            version: "1.9.15",
             context: context, 
             onOpenTask: (etn, id) => {
                 const nav = context.navigation as any;
