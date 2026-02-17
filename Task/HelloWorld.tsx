@@ -31,7 +31,8 @@ export interface IHelloWorldProps {
     onReparentTask: (childId: string, newParentId: string) => void;
     onUnparentTask: (childId: string) => void;
     onUpdateDependency: (taskId: string, dependencyId: string | null) => void;
-    onUpdateDates: (id: string, start: Date, end: Date) => void;
+    onUpdateItemDates: (id: string, start: Date, end: Date) => void;
+    onUpdateParentRollup: (id: string, start: Date, end: Date, esfuerzo: number, imputadas: number, progreso: number) => void;
 }
 
 interface IHelloWorldState {
@@ -263,26 +264,106 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         console.error("GANTT CRASH DETECTED:", error, errorInfo);
     }
 
-    componentDidMount() { if (this.props.dependenciaFechas) this.syncParentDates(); }
-    componentDidUpdate() { if (this.props.dependenciaFechas && !this.state.hasError) this.syncParentDates(); }
+    componentDidMount() { if (this.props.dependenciaFechas) this.syncParentRollups(); }
+    componentDidUpdate() { if (this.props.dependenciaFechas && !this.state.hasError) this.syncParentRollups(); }
 
-    private syncParentDates = () => {
-        const { tasks, onUpdateDates } = this.props;
+    private syncParentRollups = () => {
+        const { tasks, onUpdateParentRollup } = this.props;
         const parents = tasks.filter(t => tasks.some(c => c.parentId === t.id));
         parents.forEach(p => {
-            const computed = this.getComputedDates(p.id, tasks);
+            const computed = this.getComputedRollups(p.id, tasks);
             if (computed) {
                 const fmt = (d: Date | null) => {
                     if (!d) return null;
                     const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
                     return `${y}-${m}-${day}`;
                 };
-                if (fmt(computed.start) !== fmt(p.rawInicio) || fmt(computed.end) !== fmt(p.rawFin)) {
-                    onUpdateDates(p.id, computed.start, computed.end);
+                
+                const roundedEsfuerzo = Math.round(computed.esfuerzo * 100) / 100;
+                const roundedImputadas = Math.round(computed.imputadas * 100) / 100;
+                const roundedProgreso = computed.progreso;
+                const pEsfuerzo = Math.round((parseFloat((p.esfuerzo || "0").toString().replace(',', '.')) || 0) * 100) / 100;
+                const pImputadas = Math.round((parseFloat((p.imputadas || "0").toString().replace(',', '.')) || 0) * 100) / 100;
+                
+                if (fmt(computed.start) !== fmt(p.rawInicio) || 
+                    fmt(computed.end) !== fmt(p.rawFin) ||
+                    roundedEsfuerzo !== pEsfuerzo ||
+                    roundedImputadas !== pImputadas ||
+                    roundedProgreso !== p.progreso) {
+                    
+                    onUpdateParentRollup(p.id, computed.start, computed.end, roundedEsfuerzo, roundedImputadas, roundedProgreso);
                 }
             }
         });
     }
+
+    private getComputedRollups = (taskId: string, allTasks: ITaskItem[]): { start: Date, end: Date, esfuerzo: number, imputadas: number, progreso: number } | null => {
+        const children = allTasks.filter(c => c.parentId === taskId);
+        if (children.length === 0) return null;
+        
+        let minStart = new Date(8640000000000000); let maxEnd = new Date(-8640000000000000); 
+        let hasValid = false;
+        
+        let sumEsfuerzo = 0; let sumImputadas = 0;
+        let sumWeightedProgress = 0; let sumEsfuerzoForProgress = 0; 
+        let sumRawProgress = 0; let childCount = 0;
+
+        children.forEach(c => {
+            const isParentItself = allTasks.some(grandChild => grandChild.parentId === c.id);
+            let cStart: Date; let cEnd: Date;
+            let cEsfuerzo = parseFloat((c.esfuerzo || "0").toString().replace(',', '.')) || 0;
+            let cImputadas = parseFloat((c.imputadas || "0").toString().replace(',', '.')) || 0;
+            let cProgreso = c.progreso || 0;
+
+            if (isParentItself && this.props.dependenciaFechas) {
+                const childComputed = this.getComputedRollups(c.id, allTasks);
+                if (childComputed) { 
+                    cStart = childComputed.start; cEnd = childComputed.end; 
+                    cEsfuerzo = childComputed.esfuerzo; cImputadas = childComputed.imputadas;
+                    cProgreso = childComputed.progreso;
+                } 
+                else {
+                    cStart = c.rawInicio ? new Date(c.rawInicio) : new Date(); if (isNaN(cStart.getTime())) cStart = new Date();
+                    cEnd = c.rawFin ? new Date(c.rawFin) : new Date(cStart.getTime() + 24 * 60 * 60 * 1000); if (isNaN(cEnd.getTime())) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
+                }
+            } else {
+                cStart = c.rawInicio ? new Date(c.rawInicio) : new Date(); if (isNaN(cStart.getTime())) cStart = new Date();
+                cEnd = c.rawFin ? new Date(c.rawFin) : new Date(cStart.getTime() + 24 * 60 * 60 * 1000); if (isNaN(cEnd.getTime())) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
+            }
+
+            cStart.setHours(0, 0, 0, 0);
+            if (cEnd.getTime() <= cStart.getTime()) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
+            cEnd.setHours(23, 59, 59, 999);
+
+            if (cStart < minStart) minStart = cStart;
+            if (cEnd > maxEnd) maxEnd = cEnd;
+            
+            // Sumatorios de horas
+            sumEsfuerzo += cEsfuerzo;
+            sumImputadas += cImputadas;
+            
+            // Sumatorios para progreso ponderado
+            if (cEsfuerzo > 0) {
+                sumWeightedProgress += (cProgreso * cEsfuerzo);
+                sumEsfuerzoForProgress += cEsfuerzo;
+            }
+            sumRawProgress += cProgreso;
+            childCount++;
+            
+            hasValid = true;
+        });
+
+        let finalProgress = 0;
+        if (sumEsfuerzoForProgress > 0) {
+            // Ponderación basada en esfuerzo
+            finalProgress = Math.round(sumWeightedProgress / sumEsfuerzoForProgress);
+        } else if (childCount > 0) {
+            // Si nadie tiene horas, media simple
+            finalProgress = Math.round(sumRawProgress / childCount);
+        }
+
+        return hasValid ? { start: minStart, end: maxEnd, esfuerzo: sumEsfuerzo, imputadas: sumImputadas, progreso: finalProgress } : null;
+    };
     
     private toggleParent = (id: string) => {
         this.setState(prevState => {
@@ -310,34 +391,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         link.click(); document.body.removeChild(link);
     }
 
-    private getComputedDates = (taskId: string, allTasks: ITaskItem[]): { start: Date, end: Date } | null => {
-        const children = allTasks.filter(c => c.parentId === taskId);
-        if (children.length === 0) return null;
-        let minStart = new Date(8640000000000000); let maxEnd = new Date(-8640000000000000); let hasValid = false;
-        children.forEach(c => {
-            const isParentItself = allTasks.some(grandChild => grandChild.parentId === c.id);
-            let cStart: Date; let cEnd: Date;
-
-            if (isParentItself && this.props.dependenciaFechas) {
-                const childComputed = this.getComputedDates(c.id, allTasks);
-                if (childComputed) { cStart = childComputed.start; cEnd = childComputed.end; } 
-                else {
-                    cStart = c.rawInicio ? new Date(c.rawInicio) : new Date(); if (isNaN(cStart.getTime())) cStart = new Date();
-                    cEnd = c.rawFin ? new Date(c.rawFin) : new Date(cStart.getTime() + 24 * 60 * 60 * 1000); if (isNaN(cEnd.getTime())) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
-                }
-            } else {
-                cStart = c.rawInicio ? new Date(c.rawInicio) : new Date(); if (isNaN(cStart.getTime())) cStart = new Date();
-                cEnd = c.rawFin ? new Date(c.rawFin) : new Date(cStart.getTime() + 24 * 60 * 60 * 1000); if (isNaN(cEnd.getTime())) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
-            }
-            if (cEnd.getTime() <= cStart.getTime()) cEnd = new Date(cStart.getTime() + 24 * 60 * 60 * 1000);
-
-            if (cStart < minStart) minStart = cStart;
-            if (cEnd > maxEnd) maxEnd = cEnd;
-            hasValid = true;
-        });
-        return hasValid ? { start: minStart, end: maxEnd } : null;
-    };
-
     public render(): React.ReactNode {
         const { tasks, dependenciaFechas } = this.props;
         const { activeView, ganttViewMode } = this.state;
@@ -356,7 +409,22 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         const visibleIds = visibleTasks.map(vt => vt.id);
 
         let ganttTasks: GanttTask[] = [];
+        let dynamicRowStyles = "";
+
         if (activeView === 'gantt' && visibleTasks.length > 0) {
+            
+            // CORRECCIÓN BLINDADA: Machacamos el nth-child(even) de la librería usando la misma regla superior
+            dynamicRowStyles = visibleTasks.map((vt, index) => {
+                const isChildNode = !!vt.parentId;
+                const bgColor = isChildNode ? '#fafafa' : '#ffffff';
+                const yPos = index * 28;
+                
+                return `
+                    .gantt-container svg g.gridBody rect.gridRow[y="${yPos}"] { fill: ${bgColor} !important; }
+                    .gantt-container svg g.gridBody rect.gridRow:nth-child(${index + 1}) { fill: ${bgColor} !important; }
+                `;
+            }).join('\n');
+
             ganttTasks = visibleTasks.map(t => {
                 let start = t.rawInicio ? new Date(t.rawInicio) : new Date();
                 if (isNaN(start.getTime())) start = new Date();
@@ -374,8 +442,13 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 const itemType = hasVisibleChildren ? 'project' : 'task';
 
                 if (hasVisibleChildren && dependenciaFechas) {
-                    const computed = this.getComputedDates(t.id, tasks);
-                    if (computed) { start = computed.start; end = computed.end; }
+                    const computed = this.getComputedRollups(t.id, tasks);
+                    if (computed) { 
+                        start = computed.start; 
+                        end = computed.end; 
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(23, 59, 59, 999);
+                    }
                 }
 
                 const validProject = (t.parentId && visibleIds.includes(t.parentId)) ? t.parentId : undefined;
@@ -438,10 +511,11 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
                 {activeView === 'gantt' && (
                     <div className="gantt-container">
+                        <style>{dynamicRowStyles}</style>
                         {ganttTasks.length > 0 ? (
                             <Gantt
                                 tasks={ganttTasks} viewMode={ganttViewMode}
-                                onDateChange={(task: GanttTask) => this.props.onUpdateDates(task.id, task.start, task.end)}
+                                onDateChange={(task: GanttTask) => this.props.onUpdateItemDates(task.id, task.start, task.end)}
                                 onProgressChange={(task: GanttTask) => this.props.onUpdateProgreso(task.id, task.progress)}
                                 onDoubleClick={(task: GanttTask) => { const og = this.props.tasks.find(t => t.id === task.id); if (og) this.props.onOpenTask(og.entityName, og.id); }}
                                 rowHeight={28} listCellWidth="480px" columnWidth={60} locale="es" fontFamily="'Segoe UI', sans-serif" fontSize="12px" arrowColor="#d13438" 

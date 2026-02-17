@@ -74,66 +74,38 @@ export class Task implements ComponentFramework.StandardControl<IInputs, IOutput
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.36",
+            version: "1.9.40",
             dependenciaFechas: dependFechas, 
             context: context, 
             onOpenTask: (etn, id) => {
                 const nav = context.navigation as any;
                 if (nav.navigateTo) {
-                    const pageInput = {
-                        pageType: "entityrecord",
-                        entityName: etn,
-                        entityId: id
-                    };
-                    const navOptions = {
-                        target: 2, 
-                        position: 1, 
-                        width: { value: 70, unit: "%" },
-                        height: { value: 80, unit: "%" }
-                    };
-                    nav.navigateTo(pageInput, navOptions).then(
-                        () => { ds.refresh(); },
-                        (err: any) => { console.error("Error opening modal", err); }
-                    );
+                    const pageInput = { pageType: "entityrecord", entityName: etn, entityId: id };
+                    const navOptions = { target: 2, position: 1, width: { value: 70, unit: "%" }, height: { value: 80, unit: "%" } };
+                    nav.navigateTo(pageInput, navOptions).then(() => { ds.refresh(); }, (err: any) => { console.error("Error", err); });
                 } else {
-                    void context.navigation.openForm({ entityName: etn, entityId: id }).then(
-                        () => { ds.refresh(); }, 
-                        (err: any) => { console.error("Error opening modal", err); }
-                    );
+                    void context.navigation.openForm({ entityName: etn, entityId: id }).then(() => { ds.refresh(); }, (err: any) => { console.error("Error", err); });
                 }
             },
             onCreateTask: () => {
                 const pageContext = context.mode as any;
                 const formParams: any = {};
                 if (pageContext.contextInfo?.entityId) {
-                    formParams["sec_proyectoid"] = [{ 
-                        id: pageContext.contextInfo.entityId, 
-                        entityType: pageContext.contextInfo.entityTypeName, 
-                        name: pageContext.contextInfo.entityRecordName 
-                    }];
+                    formParams["sec_proyectoid"] = [{ id: pageContext.contextInfo.entityId, entityType: pageContext.contextInfo.entityTypeName, name: pageContext.contextInfo.entityRecordName }];
                 }
                 void context.navigation.openForm({ entityName: "sec_tarea", useQuickCreateForm: true }, formParams);
             },
             onUpdateProgreso: (id, val) => { 
                 const data = { "sec_progreso": val };
-                context.webAPI.updateRecord("sec_tarea", id, data).then(
-                    () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error actualizando progreso: " + err.message }); }
-                );
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error progreso: " + err.message }); });
             },
             onReparentTask: (childId, newParentId) => {
                 const data = { "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})` };
-                context.webAPI.updateRecord("sec_tarea", childId, data).then(
-                    () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); }
-                );
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); });
             },
             onUnparentTask: (childId) => {
                 const data = { "sec_tareaprincipalid": null };
-                context.webAPI.updateRecord("sec_tarea", childId, data).then(
-                    () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); }
-                );
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); });
             },
             onUpdateDependency: (taskId, dependencyId) => {
                 let data: any = {};
@@ -143,28 +115,29 @@ export class Task implements ComponentFramework.StandardControl<IInputs, IOutput
                 } else {
                     data["sec_dependenciaid"] = null;
                 }
-                context.webAPI.updateRecord("sec_tarea", taskId, data).then(
-                    () => { console.log("Dependencia guardada OK"); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error guardando dependencia: " + err.message }); }
-                );
+                context.webAPI.updateRecord("sec_tarea", taskId, data).then(() => { console.log("OK"); }, (err) => { context.navigation.openErrorDialog({ message: "Error dependencia: " + err.message }); });
             },
-            onUpdateDates: (id, start, end) => {
+            onUpdateItemDates: (id, start, end) => {
                 const formatDate = (d: Date) => {
-                    const year = d.getFullYear();
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
+                    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
                     return `${year}-${month}-${day}`;
                 };
-
-                const data = {
-                    "sec_inicio": formatDate(start),
-                    "sec_fin": formatDate(end)
+                const data = { "sec_inicio": formatDate(start), "sec_fin": formatDate(end) };
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error fechas: " + err.message }); });
+            },
+            onUpdateParentRollup: (id, start, end, esfuerzo, imputadas, progreso) => {
+                const formatDate = (d: Date) => {
+                    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
                 };
-
-                context.webAPI.updateRecord("sec_tarea", id, data).then(
-                    () => { ds.refresh(); },
-                    (err) => { context.navigation.openErrorDialog({ message: "Error actualizando fechas: " + err.message }); }
-                );
+                const data: any = { 
+                    "sec_inicio": formatDate(start), 
+                    "sec_fin": formatDate(end),
+                    "sec_esfuerzoestimado": esfuerzo,
+                    "sec_horasimputadas": imputadas,
+                    "sec_progreso": progreso
+                };
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error sincronizando rollup: " + err.message }); });
             }
         };
         
