@@ -2,11 +2,16 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import { HelloWorld, IHelloWorldProps, ITaskItem } from "./HelloWorld";
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 
-export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> {
-    public init(): void {}
+export class Task implements ComponentFramework.StandardControl<IInputs, IOutputs> {
+    private container: HTMLDivElement;
 
-    public updateView(context: ComponentFramework.Context<IInputs>): React.ReactElement {
+    public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
+        this.container = container;
+    }
+
+    public updateView(context: ComponentFramework.Context<IInputs>): void {
         const ds = context.parameters.sampleDataSet;
         
         const depFechasRaw = context.parameters.dependencia_fechas?.raw;
@@ -69,7 +74,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.18",
+            version: "1.9.36",
             dependenciaFechas: dependFechas, 
             context: context, 
             onOpenTask: (etn, id) => {
@@ -92,9 +97,7 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
                     );
                 } else {
                     void context.navigation.openForm({ entityName: etn, entityId: id }).then(
-                        () => { 
-                            ds.refresh(); 
-                        }, 
+                        () => { ds.refresh(); }, 
                         (err: any) => { console.error("Error opening modal", err); }
                     );
                 }
@@ -165,9 +168,11 @@ export class Task implements ComponentFramework.ReactControl<IInputs, IOutputs> 
             }
         };
         
-        return React.createElement(HelloWorld, props);
+        ReactDOM.render(React.createElement(HelloWorld, props), this.container);
     }
 
     public getOutputs(): IOutputs { return {}; }
-    public destroy(): void {}
+    public destroy(): void {
+        ReactDOM.unmountComponentAtNode(this.container);
+    }
 }

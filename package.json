@@ -14,9 +14,7 @@
   },
   "dependencies": {
     "@fluentui/react-components": "9.68.0",
-    "gantt-task-react": "^0.3.9",
-    "react": "16.14.0",
-    "react-dom": "16.14.0"
+    "gantt-task-react": "^0.3.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
@@ -24,14 +22,21 @@
     "@types/powerapps-component-framework": "^1.3.16",
     "@types/react": "^16.14.60",
     "@types/react-dom": "^16.9.24",
+    "ajv": "^8.18.0",
+    "ajv-keywords": "^5.1.0",
     "eslint": "^8.56.0",
     "eslint-plugin-promise": "^7.1.0",
     "eslint-plugin-react": "^7.37.2",
     "globals": "^15.15.0",
     "pcf-scripts": "^1",
     "pcf-start": "^1",
-    "react": "^16.14.0",
+    "react": "16.14.0",
+    "react-dom": "16.14.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "8.44.0"
+  },
+  "overrides": {
+    "react": "$react",
+    "react-dom": "$react-dom"
   }
 }

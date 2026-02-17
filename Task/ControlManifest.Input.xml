@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="sec" constructor="Task" version="1.9.18" display-name-key="Task" description-key="Task Control" control-type="virtual">
+  <control namespace="sec" constructor="Task" version="1.9.36" display-name-key="Task" description-key="Task Control" control-type="standard">
     
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />
@@ -22,11 +22,10 @@
       <property-set name="sec_tareaprincipalid" display-name-key="Tarea Principal" of-type="Lookup.Simple" usage="bound" required="false" />
       <property-set name="sec_dependenciaid" display-name-key="Dependencia" of-type="Lookup.Simple" usage="bound" required="false" />
     </data-set>
-    
+
     <resources>
       <code path="index.ts" order="1"/>
-      <platform-library name="React" version="16.14.0" />
-      <css path="css/Task.css" order="1" />
+      <css path="css/Task.css" order="2" />
     </resources>
   </control>
 </manifest>
