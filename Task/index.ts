@@ -74,7 +74,7 @@ export class Task implements ComponentFramework.StandardControl<IInputs, IOutput
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.40",
+            version: "1.9.41",
             dependenciaFechas: dependFechas, 
             context: context, 
             onOpenTask: (etn, id) => {

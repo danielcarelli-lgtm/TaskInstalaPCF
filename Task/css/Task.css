@@ -9,10 +9,10 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     position: relative; 
 }
 
-/* VERSIÓN MOVIDA A LA ESQUINA INFERIOR DERECHA PARA QUE NO ESTORBE */
+/* VERSIÓN EN LA ESQUINA INFERIOR DERECHA */
 .v-tag { position: absolute; bottom: 5px; right: 10px; top: auto; font-size: 10px; color: #999; background: #f0f0f0; padding: 2px 5px; border-radius: 4px; z-index: 1000; }
 
-.header-actions { padding: 8px; border-bottom: 1px solid #e0e0e0; background: #fff; display: flex; align-items: center; height: 40px; }
+.header-actions { padding: 8px; border-bottom: 1px solid #e0e0e0; background: #fff; display: flex; align-items: center; height: 40px; flex-shrink: 0; }
 .btn-new { background-color: #0078d4; color: white; border: none; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; }
 .btn-new:hover { background-color: #106ebe; }
 
@@ -21,30 +21,40 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-excel:hover { background-color: #0b5a0b; }
 
 /* GRID HEADER */
-.grid-header { display: flex; width: 100%; background-color: #f3f2f1; border-bottom: 2px solid #ccc; height: 35px; align-items: center; }
-.gh-cell { font-weight: 600; font-size: 11px; color: #201f1e; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; letter-spacing: 0.5px; }
+.grid-header { display: flex; width: 100%; background-color: #f3f2f1; border-bottom: 2px solid #ccc; height: 35px; align-items: center; flex-shrink: 0; }
+.gh-cell { font-weight: 600; font-size: 11px; color: #201f1e; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* GRID BODY */
-.grid-body { flex-grow: 1; overflow-y: auto; width: 100%; }
+.grid-body { flex-grow: 1; overflow-y: auto; overflow-x: auto; width: 100%; }
 
-.grid-row { display: flex; width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; transition: background-color 0.2s; }
+.grid-row { display: flex; width: fit-content; min-width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; transition: background-color 0.2s; }
 .grid-row:hover { background-color: #eff6fc; }
 .row-drag-over { background-color: #c7e0f4 !important; border: 2px dashed #0078d4; }
 
-.gd-cell { font-size: 12px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 25px; color: #323130; }
+/* AJUSTE DE CELDAS PARA EVITAR INVASIÓN DE TEXTO */
+.gd-cell { 
+    font-size: 12px; 
+    padding: 0 6px; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    line-height: 25px; 
+    color: #323130; 
+    flex-shrink: 0; /* DIRECTIVA CLAVE: No permite que la celda se encoja */
+}
 
 .row-parent { background-color: #fff; }
 .row-child { background-color: #fafafa; color: #605e5c; }
 
-/* COLUMNAS */
-.w-nro { width: 40px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
-.w-id { width: 50px; text-align: center; }
-.w-name { flex-grow: 2; min-width: 180px; display: flex; align-items: center; } 
-.w-members { width: 80px; display: flex; align-items: center; }
-.w-date { width: 110px; text-align: center; } 
+/* COLUMNAS CON ANCHOS FIJOS PROTEGIDOS */
+.w-nro { width: 45px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
+.w-id { width: 65px; text-align: center; }
+.w-name { width: 350px; display: flex; align-items: center; } 
+.w-members { width: 90px; display: flex; align-items: center; }
+.w-date { width: 100px; text-align: center; } 
 
 /* SELECT MODERNO */
-.w-dep { width: 120px; color: #666; position: relative; } 
+.w-dep { width: 130px; color: #666; position: relative; } 
 .modern-select {
     width: 100%;
     height: 100%;
@@ -58,14 +68,13 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     appearance: none; 
     -webkit-appearance: none;
     padding-right: 15px; 
+    text-overflow: ellipsis;
 }
 
 .modern-select:hover { background-color: #e1dfdd; color: #000; }
-.modern-select option { background-color: #fff; color: #333; padding: 5px; }
-
-.w-num { width: 70px; text-align: right; }
-.w-prog { width: 110px; display: flex; align-items: center; }
-.w-stat { width: 80px; text-align: center; }
+.w-num { width: 75px; text-align: right; }
+.w-prog { width: 120px; display: flex; align-items: center; }
+.w-stat { width: 90px; text-align: center; }
 
 /* Componentes */
 .members-container { display: flex; align-items: center; height: 100%; }
@@ -76,7 +85,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .unbind-btn { color: #999; font-size: 14px; margin-right: 6px; cursor: pointer; font-weight: bold; transition: color 0.2s; }
 .unbind-btn:hover { color: #d13438; }
 .child-indicator { color: #ccc; font-size: 12px; margin-right: 6px; }
-.link-name { color: #0078d4; cursor: pointer; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link-name { color: #0078d4; cursor: pointer; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; width: 100%; }
 .link-name:hover { text-decoration: underline; }
 
 .prog-bar-container { flex-grow: 1; height: 8px; background-color: #e0e0e0; border-radius: 4px; margin-right: 8px; overflow: hidden; }
@@ -98,9 +107,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-zoom:hover { background: #e1dfdd; }
 .btn-zoom.active { background: #fff; color: #107c10; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: default; }
 
-.gantt-container { flex-grow: 1; overflow-y: auto; overflow-x: hidden; width: 100%; background: #fff; }
+.gantt-container { flex-grow: 1; overflow: auto; width: 100%; background: #fff; }
 
-/* INYECTADO: Flechas de dependencia rojas PUNTEADAS */
+/* MANTENIDO: Flechas de dependencia rojas PUNTEADAS */
 .gantt-container svg path {
     stroke-dasharray: 5, 4 !important;
     stroke-width: 1.5px !important;
