@@ -4,7 +4,7 @@ import { HelloWorld, IHelloWorldProps, ITaskItem } from "./HelloWorld";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
-export class Task implements ComponentFramework.StandardControl<IInputs, IOutputs> {
+export class NuevaVersionTask implements ComponentFramework.StandardControl<IInputs, IOutputs> {
     private container: HTMLDivElement;
 
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
@@ -74,7 +74,7 @@ export class Task implements ComponentFramework.StandardControl<IInputs, IOutput
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "1.9.41",
+            version: "2.0.0", // Actualizado aquí
             dependenciaFechas: dependFechas, 
             context: context, 
             onOpenTask: (etn, id) => {
