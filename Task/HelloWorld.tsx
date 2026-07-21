@@ -20,10 +20,23 @@ export interface ITaskItem {
     rawFin: Date | null;
 }
 
+export interface IProductLine { 
+    id: string; 
+    name: string; 
+    productName: string; 
+    taskId: string | null; 
+    serialNumber?: string;
+    status?: string;
+    rawStatus?: number;
+    location?: string;
+    productNumber?: string;
+}
+
 export interface IHelloWorldProps { 
     tasks: ITaskItem[]; 
     version: string;
     dependenciaFechas: boolean;
+    projectId: string;
     context: ComponentFramework.Context<any>; 
     onOpenTask: (etn: string, id: string) => void;
     onCreateTask: () => void;
@@ -41,6 +54,101 @@ interface IHelloWorldState {
     ganttViewMode: ViewMode;
     hasError: boolean;
     errorMsg: string;
+    isProductsOpen: boolean;
+    productRefreshTrigger: number;
+    products: IProductLine[];
+    productsLoading: boolean;
+}
+
+// === PANEL LATERAL DE PRODUCTOS ===
+interface IProductPanelProps { 
+    projectId: string; 
+    lines: IProductLine[];
+    loading: boolean;
+    onUnassign: (id: string) => void; 
+    onUpdateStatus: (id: string, newStatus: number) => void;
+}
+interface IProductPanelState { filter: 'unassigned' | 'assigned'; }
+
+class ProductPanel extends React.Component<IProductPanelProps, IProductPanelState> {
+    constructor(props: IProductPanelProps) {
+        super(props);
+        this.state = { filter: 'unassigned' };
+    }
+    
+    render() {
+        const { lines, loading, projectId, onUnassign, onUpdateStatus } = this.props;
+        const { filter } = this.state;
+        
+        const pendingLines = lines.filter(l => !l.taskId);
+        const assignedLines = lines.filter(l => !!l.taskId);
+        const visibleLines = filter === 'unassigned' ? pendingLines : assignedLines;
+
+        return (
+            <div className="products-panel">
+                <div className="panel-header">Líneas de Producto</div>
+                <div className="switch-container">
+                    <button className={`btn-switch ${filter === 'unassigned' ? 'active' : ''}`} onClick={() => this.setState({ filter: 'unassigned' })}>
+                        Pendientes ({pendingLines.length})
+                    </button>
+                    <button className={`btn-switch ${filter === 'assigned' ? 'active' : ''}`} onClick={() => this.setState({ filter: 'assigned' })}>
+                        Asignadas ({assignedLines.length})
+                    </button>
+                </div>
+                
+                <div className="card-container">
+                    {!projectId && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>Guarde el proyecto primero.</div>}
+                    {loading && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>Cargando materiales...</div>}
+                    {!loading && visibleLines.length === 0 && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>No hay líneas.</div>}
+                    
+                    {!loading && visibleLines.map(line => {
+                        // RESTRICCIÓN: Solo se pueden asignar materiales si su estado es Pendiente (909540000)
+                        const isDraggable = filter === 'unassigned' && line.rawStatus === 909540000;
+                        
+                        const onDragStart = (e: React.DragEvent) => {
+                            if (!isDraggable) {
+                                e.preventDefault();
+                                return;
+                            }
+                            e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'product', id: line.id }));
+                            e.dataTransfer.effectAllowed = "copyMove";
+                        };
+
+                        let statusClass = "prod-status-default";
+                        if (line.rawStatus === 909540000) statusClass = "prod-status-pend";
+                        else if (line.rawStatus === 909540001) statusClass = "prod-status-inst";
+                        else if (line.rawStatus === 909540002) statusClass = "prod-status-dev";
+
+                        return (
+                            <div key={line.id} className={`prod-card ${!isDraggable && filter === 'unassigned' ? 'not-draggable' : ''}`} draggable={isDraggable} onDragStart={onDragStart} title={isDraggable ? "Arrastrar a tarea hija" : (filter === 'unassigned' ? "Solo los materiales Pendientes se pueden asignar" : "")}>
+                                <div className="card-title">{line.productName}</div>
+                                <div className="card-sub">{line.name}</div>
+                                <div className="card-id">ID: {line.productNumber || 'N/A'}</div>
+                                {line.serialNumber && <div style={{color: '#777', fontSize: '9px', marginTop: '2px'}}>S/N: {line.serialNumber}</div>}
+                                
+                                {line.status && (
+                                    <div style={{marginTop: '4px'}}>
+                                        <span className={`pill ${statusClass}`}>{line.status}</span>
+                                    </div>
+                                )}
+                                
+                                <div className="card-actions">
+                                    {/* RESTRICCIÓN: Solo se puede Liberar si está pendiente (909540000) */}
+                                    {filter === 'assigned' && line.rawStatus === 909540000 && (
+                                        <button className="btn-release" onClick={() => onUnassign(line.id)}>Liberar</button>
+                                    )}
+                                    {/* RESTRICCIÓN: Botón "Instalar" solo para estado pendiente */}
+                                    {line.rawStatus === 909540000 && (
+                                        <button className="btn-install" onClick={() => onUpdateStatus(line.id, 909540001)}>Instalar</button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
 }
 
 // === FACEPILE ===
@@ -95,9 +203,11 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
 
 // === FILA GRID NORMAL ===
 interface ITaskRowProps { 
-    task: ITaskItem, allTasks: ITaskItem[], isCollapsed: boolean,
+    task: ITaskItem, allTasks: ITaskItem[], isCollapsed: boolean, products: IProductLine[],
     onToggle: (id: string) => void, onOpen: (etn: string, id: string) => void, webAPI: ComponentFramework.WebApi,
-    onDropAction: (draggedId: string, targetId: string) => void, onUnparentAction: (id: string) => void, onUpdateDep: (taskId: string, depId: string | null) => void
+    onDropAction: (draggedId: string, targetId: string) => void, 
+    onAssignProduct: (productId: string, taskId: string) => void,
+    onUnparentAction: (id: string) => void, onUpdateDep: (taskId: string, depId: string | null) => void
 }
 interface ITaskRowState { isDragOver: boolean, localDepId: string }
 class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
@@ -108,32 +218,107 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
     componentDidUpdate(prevProps: ITaskRowProps) {
         if (prevProps.task.depId !== this.props.task.depId) this.setState({ localDepId: this.props.task.depId || "" });
     }
-    handleDragStart = (e: React.DragEvent) => { e.dataTransfer.setData("text/plain", this.props.task.id); e.dataTransfer.effectAllowed = "move"; };
+    handleDragStart = (e: React.DragEvent) => { 
+        e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'task', id: this.props.task.id }));
+        e.dataTransfer.effectAllowed = "move"; 
+    };
     handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (!this.state.isDragOver) this.setState({ isDragOver: true }); };
     handleDragLeave = () => { this.setState({ isDragOver: false }); };
+    
     handleDrop = (e: React.DragEvent) => {
         e.preventDefault(); this.setState({ isDragOver: false });
-        const draggedId = e.dataTransfer.getData("text/plain");
-        if (!draggedId || draggedId === this.props.task.id) return;
-        if (this.props.task.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
-        if (this.props.allTasks.some(t => t.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
-        this.props.onDropAction(draggedId, this.props.task.id);
+        const rawData = e.dataTransfer.getData("text/plain");
+        if (!rawData) return;
+
+        try {
+            const parsed = JSON.parse(rawData);
+            if (parsed.type === 'task') {
+                const draggedId = parsed.id;
+                if (!draggedId || draggedId === this.props.task.id) return;
+                if (this.props.task.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
+                if (this.props.allTasks.some(t => t.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
+                this.props.onDropAction(draggedId, this.props.task.id);
+            } else if (parsed.type === 'product') {
+                if (Number.isInteger(this.props.task.virtualNro)) { alert("⚠️ Acción Denegada: Solo se pueden asignar materiales a tareas hijas."); return; }
+                this.props.onAssignProduct(parsed.id, this.props.task.id);
+            }
+        } catch (err) {
+            console.error("Payload drag and drop desconocido", err);
+        }
     };
+
     handleUnparentClick = (e: React.MouseEvent) => { e.stopPropagation(); this.props.onUnparentAction(this.props.task.id); };
     handleDepChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value; this.setState({ localDepId: val }); this.props.onUpdateDep(this.props.task.id, val === "" ? null : val);
     };
+    
     render() {
-        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI } = this.props;
+        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, products } = this.props;
         const isParent = Number.isInteger(task.virtualNro);
         const availableDependencies = allTasks.filter(candidate => candidate.id !== task.id && candidate.depId !== task.id);
+        
+        // Agrupación segura para Tooltip de Productos garantizando que id siempre sea un string
+        const taskProducts = products.filter(p => p.taskId === task.id);
+        const hasProducts = taskProducts.length > 0;
+        
+        let summaryValues: any[] = [];
+        if (hasProducts) {
+            const summaryObj = taskProducts.reduce((acc, p) => {
+                const safeId = p.productNumber || "N/A";
+                const key = safeId + "_" + p.productName;
+                
+                if (!acc[key]) {
+                    acc[key] = { name: p.productName, id: safeId, pend: 0, inst: 0, dev: 0 };
+                }
+                
+                if (p.rawStatus === 909540000) acc[key].pend++;
+                else if (p.rawStatus === 909540001) acc[key].inst++;
+                else if (p.rawStatus === 909540002) acc[key].dev++;
+                return acc;
+            }, {} as Record<string, {name: string, id: string, pend: number, inst: number, dev: number}>);
+            
+            summaryValues = Object.values(summaryObj);
+        }
+
         return (
             <div className={`grid-row ${isParent ? 'row-parent' : 'row-child'} ${this.state.isDragOver ? 'row-drag-over' : ''}`} draggable="true" onDragStart={this.handleDragStart} onDragOver={this.handleDragOver} onDragLeave={this.handleDragLeave} onDrop={this.handleDrop}>
                 <div className="gd-cell w-nro" title="Orden Jerárquico">{task.virtualNro.toFixed(2)}</div>
+                
+                <div className="gd-cell w-prod">
+                    {hasProducts && (
+                        <div className="prod-count-wrapper">
+                            <span style={{ fontSize: '12px' }}>📦</span>
+                            <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#0078d4' }}>{taskProducts.length}</span>
+                            
+                            <div className="prod-tooltip">
+                                <table className="tooltip-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th><th>ID</th>
+                                            <th style={{textAlign:'center'}}>Pdte.</th><th style={{textAlign:'center'}}>Inst.</th><th style={{textAlign:'center'}}>Dev.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {summaryValues.map((s, idx) => (
+                                            <tr key={idx}>
+                                                <td>{s.name}</td>
+                                                <td style={{fontFamily: 'monospace'}}>{s.id}</td>
+                                                <td style={{textAlign: 'center'}}>{s.pend}</td>
+                                                <td style={{textAlign: 'center'}}>{s.inst}</td>
+                                                <td style={{textAlign: 'center'}}>{s.dev}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 <div className="gd-cell w-id" title={task.idTarea}>{task.idTarea}</div>
-                <div className="gd-cell w-name" title={task.nombre} style={{ paddingLeft: isParent ? '0px' : '20px' }}>
+                <div className="gd-cell w-name" title={task.nombre}>
                     {isParent && <span className="toggle-btn" onClick={() => onToggle(task.id)}>{isCollapsed ? '▶' : '▼'}</span>}
-                    {!isParent && <span className="child-indicator unbind-btn" onClick={this.handleUnparentClick} title="Desvincular">↳</span>}
+                    {!isParent && <span className="child-indicator unbind-btn" style={{ marginLeft: '14px' }} onClick={this.handleUnparentClick} title="Desvincular">↳</span>}
                     <a className="link-name" onClick={() => onOpen(task.entityName, task.id)} style={{ fontWeight: isParent ? 'bold' : 'normal' }}>{task.nombre}</a>
                 </div>
                 <div className="gd-cell w-members"><MemberFacepile taskId={task.id} webAPI={webAPI} /></div>
@@ -196,39 +381,49 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
     constructor(props: any) { super(props); this.state = { dragOverId: null }; }
     render() {
         const { rowHeight, tasks: ganttViewTasks, fontFamily, fontSize } = this.props.ganttProps;
-        const { tasks, webAPI, onOpenTask, onReparentTask, onUnparentTask } = this.props;
-        const formatGanttDate = (date: Date) => {
-            const d = String(date.getDate()).padStart(2, '0');
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const y = date.getFullYear();
-            return `${d}/${m}/${y}`;
-        };
+        const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onUnparentTask } = this.props;
 
         return (
             <div style={{ fontFamily, fontSize }}>
                 {ganttViewTasks.map((t: GanttTask) => {
                     const originalTask = tasks.find((x: any) => x.id === t.id);
                     const isChild = originalTask ? !!originalTask.parentId : false;
-                    const handleDragStart = (e: React.DragEvent) => { e.dataTransfer.setData("text/plain", t.id); e.dataTransfer.effectAllowed = "move"; };
+                    
+                    const handleDragStart = (e: React.DragEvent) => { 
+                        e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'task', id: t.id })); 
+                        e.dataTransfer.effectAllowed = "move"; 
+                    };
                     const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); if (this.state.dragOverId !== t.id) this.setState({ dragOverId: t.id }); };
                     const handleDragLeave = () => { if (this.state.dragOverId === t.id) this.setState({ dragOverId: null }); };
+                    
                     const handleDrop = (e: React.DragEvent) => {
                         e.preventDefault(); this.setState({ dragOverId: null });
-                        const draggedId = e.dataTransfer.getData("text/plain");
-                        if (!draggedId || draggedId === t.id) return;
-                        if (originalTask && originalTask.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
-                        if (tasks.some((x:any) => x.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
-                        onReparentTask(draggedId, t.id);
+                        const rawData = e.dataTransfer.getData("text/plain");
+                        if (!rawData) return;
+                        
+                        try {
+                            const parsed = JSON.parse(rawData);
+                            if (parsed.type === 'task') {
+                                const draggedId = parsed.id;
+                                if (!draggedId || draggedId === t.id) return;
+                                if (originalTask && originalTask.parentId) { alert("⚠️ Acción Denegada: No aceptamos 'nietos'."); return; }
+                                if (tasks.some((x:any) => x.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
+                                onReparentTask(draggedId, t.id);
+                            } else if (parsed.type === 'product') {
+                                if (!isChild) { alert("⚠️ Acción Denegada: Solo se pueden asignar materiales a tareas hijas."); return; }
+                                onAssignProduct(parsed.id, t.id);
+                            }
+                        } catch (err) { }
                     };
+                    
                     return (
                         <div className={`grid-row ${!isChild ? 'row-parent' : 'row-child'} ${this.state.dragOverId === t.id ? 'row-drag-over' : ''}`} style={{ height: rowHeight }} key={t.id} draggable="true" onDragStart={handleDragStart} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-                            <div className="gd-cell" style={{ flexGrow: 2, minWidth: '180px', paddingLeft: isChild ? '30px' : '10px', display: 'flex', alignItems: 'center' }} title={t.name}>
-                                {isChild && <span className="child-indicator unbind-btn" onClick={(e) => { e.stopPropagation(); onUnparentTask(t.id); }} title="Desvincular">↳</span>}
+                            <div className="gd-cell" style={{ flexGrow: 2, minWidth: '180px', display: 'flex', alignItems: 'center' }} title={t.name}>
+                                {!isChild && <span style={{ width: '10px', display: 'inline-block' }}></span>}
+                                {isChild && <span className="child-indicator unbind-btn" style={{ marginLeft: '24px' }} onClick={(e) => { e.stopPropagation(); onUnparentTask(t.id); }} title="Desvincular">↳</span>}
                                 <a className="link-name" onClick={() => { if(originalTask) onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: !isChild ? 'bold' : 'normal' }}>{t.name}</a>
                             </div>
                             <div className="gd-cell w-members"><MemberFacepile taskId={t.id} webAPI={webAPI} /></div>
-                            <div className="gd-cell w-date">{formatGanttDate(t.start)}</div>
-                            <div className="gd-cell w-date">{formatGanttDate(t.end)}</div>
                         </div>
                     );
                 })}
@@ -248,13 +443,18 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             activeView: 'grid',
             ganttViewMode: ViewMode.Day,
             hasError: false,
-            errorMsg: ""
+            errorMsg: "",
+            isProductsOpen: false,
+            productRefreshTrigger: 0,
+            products: [],
+            productsLoading: false
         };
 
         this.GanttTableWrapper = (ganttProps: any) => (
             <CustomGanttTable 
                 ganttProps={ganttProps} tasks={this.props.tasks} webAPI={this.props.context.webAPI}
                 onOpenTask={this.props.onOpenTask} onReparentTask={this.props.onReparentTask} onUnparentTask={this.props.onUnparentTask}
+                onAssignProduct={this.handleAssignProduct}
             />
         );
     }
@@ -264,8 +464,101 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         console.error("GANTT CRASH DETECTED:", error, errorInfo);
     }
 
-    componentDidMount() { if (this.props.dependenciaFechas) this.syncParentRollups(); }
-    componentDidUpdate() { if (this.props.dependenciaFechas && !this.state.hasError) this.syncParentRollups(); }
+    componentDidMount() {
+        if (this.props.dependenciaFechas) this.syncParentRollups();
+        if (this.props.projectId) this.fetchProducts();
+    }
+
+    componentDidUpdate(prevProps: IHelloWorldProps, prevState: IHelloWorldState) {
+        if (this.props.dependenciaFechas && !this.state.hasError) this.syncParentRollups();
+        
+        if (prevProps.projectId !== this.props.projectId || prevState.productRefreshTrigger !== this.state.productRefreshTrigger) {
+            if (this.props.projectId) this.fetchProducts();
+        }
+    }
+
+    private fetchProducts = () => {
+        this.setState({ productsLoading: true });
+        
+        const fetchXml = `
+        <fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
+          <entity name="sec_lineadeproductodeproyecto">
+            <attribute name="sec_lineadeproductodeproyectoid" />
+            <attribute name="sec_name" />
+            <attribute name="sec_tareadeproyectoid" />
+            <attribute name="sec_numerodeserie" />
+            <attribute name="sec_estadodelproducto" />
+            <attribute name="sec_descripciondelaubicacion" />
+            <order attribute="sec_name" descending="false" />
+            <link-entity name="sec_productodeproyecto" from="sec_productodeproyectoid" to="sec_productodeproyectoid" link-type="inner" alias="ac">
+              <attribute name="sec_nombre" />
+              <attribute name="sec_productoid" />
+              <filter type="and">
+                <condition attribute="sec_proyectoid" operator="eq" value="${this.props.projectId}" />
+              </filter>
+              <link-entity name="product" from="productid" to="sec_productoid" alias="P">
+                <attribute name="productnumber" />
+              </link-entity>
+            </link-entity>
+          </entity>
+        </fetch>`;
+
+        const query = `?fetchXml=${encodeURIComponent(fetchXml)}`;
+        
+        this.props.context.webAPI.retrieveMultipleRecords("sec_lineadeproductodeproyecto", query).then(
+            (result: any) => {
+                const lines: IProductLine[] = result.entities.map((e: any) => {
+                    const prodName = e["ac.sec_nombre"] || e["_sec_productodeproyectoid_value@OData.Community.Display.V1.FormattedValue"] || "Producto Desconocido";
+                    return {
+                        id: e.sec_lineadeproductodeproyectoid,
+                        name: e.sec_name,
+                        productName: prodName,
+                        taskId: e._sec_tareadeproyectoid_value || e.sec_tareadeproyectoid || null,
+                        serialNumber: e.sec_numerodeserie,
+                        status: e["sec_estadodelproducto@OData.Community.Display.V1.FormattedValue"] || e.sec_estadodelproducto,
+                        rawStatus: e.sec_estadodelproducto,
+                        location: e.sec_descripciondelaubicacion,
+                        productNumber: e["P.productnumber"] || "N/A"
+                    };
+                });
+                this.setState({ products: lines, productsLoading: false });
+            },
+            (error: any) => { 
+                console.error("Error cargando productos:", error);
+                this.setState({ productsLoading: false }); 
+            }
+        );
+    }
+
+    private handleUnassignProduct = (productId: string) => {
+        const data = { "sec_tareadeproyectoid": null };
+        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+        .then(() => {
+            this.setState({ productRefreshTrigger: Date.now() });
+        }, (err) => {
+            this.props.context.navigation.openErrorDialog({ message: "Error liberando producto: " + err.message });
+        });
+    }
+
+    private handleAssignProduct = (productId: string, taskId: string) => {
+        const data = { "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${taskId})` };
+        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+        .then(() => {
+            this.setState({ productRefreshTrigger: Date.now() });
+        }, (err) => {
+            this.props.context.navigation.openErrorDialog({ message: "Error asignando producto: " + err.message });
+        });
+    }
+
+    private handleUpdateProductStatus = (productId: string, newStatus: number) => {
+        const data = { "sec_estadodelproducto": newStatus };
+        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+        .then(() => {
+            this.setState({ productRefreshTrigger: Date.now() });
+        }, (err: any) => {
+            this.props.context.navigation.openErrorDialog({ message: "Error actualizando estado: " + err.message });
+        });
+    }
 
     private syncParentRollups = () => {
         const { tasks, onUpdateParentRollup } = this.props;
@@ -338,11 +631,9 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             if (cStart < minStart) minStart = cStart;
             if (cEnd > maxEnd) maxEnd = cEnd;
             
-            // Sumatorios de horas
             sumEsfuerzo += cEsfuerzo;
             sumImputadas += cImputadas;
             
-            // Sumatorios para progreso ponderado
             if (cEsfuerzo > 0) {
                 sumWeightedProgress += (cProgreso * cEsfuerzo);
                 sumEsfuerzoForProgress += cEsfuerzo;
@@ -355,10 +646,8 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
         let finalProgress = 0;
         if (sumEsfuerzoForProgress > 0) {
-            // Ponderación basada en esfuerzo
             finalProgress = Math.round(sumWeightedProgress / sumEsfuerzoForProgress);
         } else if (childCount > 0) {
-            // Si nadie tiene horas, media simple
             finalProgress = Math.round(sumRawProgress / childCount);
         }
 
@@ -392,8 +681,8 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
     }
 
     public render(): React.ReactNode {
-        const { tasks, dependenciaFechas } = this.props;
-        const { activeView, ganttViewMode } = this.state;
+        const { tasks, dependenciaFechas, projectId, context } = this.props;
+        const { activeView, ganttViewMode, isProductsOpen, products, productsLoading } = this.state;
 
         if (this.state.hasError) {
             return (
@@ -412,13 +701,10 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         let dynamicRowStyles = "";
 
         if (activeView === 'gantt' && visibleTasks.length > 0) {
-            
-            // CORRECCIÓN BLINDADA: Machacamos el nth-child(even) de la librería usando la misma regla superior
             dynamicRowStyles = visibleTasks.map((vt, index) => {
                 const isChildNode = !!vt.parentId;
                 const bgColor = isChildNode ? '#fafafa' : '#ffffff';
                 const yPos = index * 28;
-                
                 return `
                     .gantt-container svg g.gridBody rect.gridRow[y="${yPos}"] { fill: ${bgColor} !important; }
                     .gantt-container svg g.gridBody rect.gridRow:nth-child(${index + 1}) { fill: ${bgColor} !important; }
@@ -476,11 +762,15 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
                     <button className="btn-excel" onClick={this.handleExportExcel} title="Descargar CSV">📊 Excel</button>
-                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra para agrupar. Click en ↳ para desagrupar.</span>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra materiales hacia las tareas hijas.</span>
                     
                     <div className="view-toggle-container">
                         <button className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'grid' })}>Lista</button>
                         <button className={`btn-view ${activeView === 'gantt' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'gantt' })}>Gantt</button>
+                        
+                        <button className={`btn-view ${isProductsOpen ? 'active-prod' : ''}`} style={{marginLeft:'10px'}} onClick={() => this.setState({ isProductsOpen: !isProductsOpen })}>
+                            📦 Productos
+                        </button>
                     </div>
 
                     {activeView === 'gantt' && (
@@ -492,40 +782,57 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                     )}
                 </div>
                 
-                {activeView === 'grid' && (
-                    <>
-                        <div className="grid-header">
-                            <div className="gh-cell w-nro">#</div><div className="gh-cell w-id">ID</div><div className="gh-cell w-name">NOMBRE</div><div className="gh-cell w-members">EQUIPO</div>
-                            <div className="gh-cell w-date">INICIO</div><div className="gh-cell w-date">FIN</div><div className="gh-cell w-dep">DEPENDENCIA</div><div className="gh-cell w-num">ESFUERZO</div>
-                            <div className="gh-cell w-num">IMPUTADAS</div><div className="gh-cell w-prog">PROGRESO</div><div className="gh-cell w-stat">ESTADO</div>
-                        </div>
-                        <div className="grid-body">
-                            {visibleTasks.map((task) => (
-                                <TaskRow key={task.id} task={task} allTasks={this.props.tasks} isCollapsed={this.state.collapsedParents.includes(task.id)} onToggle={this.toggleParent}
-                                    onOpen={this.props.onOpenTask} webAPI={this.props.context.webAPI} onDropAction={this.props.onReparentTask} onUnparentAction={this.props.onUnparentTask} onUpdateDep={this.props.onUpdateDependency}
-                                />
-                            ))}
-                        </div>
-                    </>
-                )}
+                <div className="layout-split">
+                    <div className="main-content">
+                        {activeView === 'grid' && (
+                            <>
+                                <div className="grid-header">
+                                    <div className="gh-cell w-nro">#</div>
+                                    <div className="gh-cell w-prod" title="Materiales Asignados">📦</div>
+                                    <div className="gh-cell w-id">ID</div><div className="gh-cell w-name">NOMBRE</div><div className="gh-cell w-members">EQUIPO</div>
+                                    <div className="gh-cell w-date">INICIO</div><div className="gh-cell w-date">FIN</div><div className="gh-cell w-dep">DEPENDENCIA</div><div className="gh-cell w-num">ESFUERZO</div>
+                                    <div className="gh-cell w-num">IMPUTADAS</div><div className="gh-cell w-prog">PROGRESO</div><div className="gh-cell w-stat">ESTADO</div>
+                                </div>
+                                <div className="grid-body">
+                                    {visibleTasks.map((task) => (
+                                        <TaskRow key={task.id} task={task} allTasks={this.props.tasks} products={products} isCollapsed={this.state.collapsedParents.includes(task.id)} onToggle={this.toggleParent}
+                                            onOpen={this.props.onOpenTask} webAPI={this.props.context.webAPI} onDropAction={this.props.onReparentTask} onUnparentAction={this.props.onUnparentTask} onUpdateDep={this.props.onUpdateDependency}
+                                            onAssignProduct={this.handleAssignProduct}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
 
-                {activeView === 'gantt' && (
-                    <div className="gantt-container">
-                        <style>{dynamicRowStyles}</style>
-                        {ganttTasks.length > 0 ? (
-                            <Gantt
-                                tasks={ganttTasks} viewMode={ganttViewMode}
-                                onDateChange={(task: GanttTask) => this.props.onUpdateItemDates(task.id, task.start, task.end)}
-                                onProgressChange={(task: GanttTask) => this.props.onUpdateProgreso(task.id, task.progress)}
-                                onDoubleClick={(task: GanttTask) => { const og = this.props.tasks.find(t => t.id === task.id); if (og) this.props.onOpenTask(og.entityName, og.id); }}
-                                rowHeight={28} listCellWidth="480px" columnWidth={60} locale="es" fontFamily="'Segoe UI', sans-serif" fontSize="12px" arrowColor="#d13438" 
-                                TaskListHeader={CustomGanttHeader} TaskListTable={this.GanttTableWrapper} TooltipContent={CustomGanttTooltip}
-                            />
-                        ) : (
-                            <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No hay datos de fechas válidas para mostrar en el Gantt.</div>
+                        {activeView === 'gantt' && (
+                            <div className="gantt-container">
+                                <style>{dynamicRowStyles}</style>
+                                {ganttTasks.length > 0 ? (
+                                    <Gantt
+                                        tasks={ganttTasks} viewMode={ganttViewMode}
+                                        onDateChange={(task: GanttTask) => this.props.onUpdateItemDates(task.id, task.start, task.end)}
+                                        onProgressChange={(task: GanttTask) => this.props.onUpdateProgreso(task.id, task.progress)}
+                                        onDoubleClick={(task: GanttTask) => { const og = this.props.tasks.find(t => t.id === task.id); if (og) this.props.onOpenTask(og.entityName, og.id); }}
+                                        rowHeight={28} listCellWidth="480px" columnWidth={60} locale="es" fontFamily="'Segoe UI', sans-serif" fontSize="12px" arrowColor="#d13438" 
+                                        TaskListHeader={CustomGanttHeader} TaskListTable={this.GanttTableWrapper} TooltipContent={CustomGanttTooltip}
+                                    />
+                                ) : (
+                                    <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No hay datos de fechas válidas para mostrar en el Gantt.</div>
+                                )}
+                            </div>
                         )}
                     </div>
-                )}
+                    
+                    {isProductsOpen && (
+                        <ProductPanel 
+                            projectId={projectId} 
+                            lines={products}
+                            loading={productsLoading}
+                            onUnassign={this.handleUnassignProduct} 
+                            onUpdateStatus={this.handleUpdateProductStatus} 
+                        />
+                    )}
+                </div>
             </div>
         );
     }

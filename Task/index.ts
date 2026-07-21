@@ -13,9 +13,11 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         const ds = context.parameters.sampleDataSet;
-        
         const depFechasRaw = context.parameters.dependencia_fechas?.raw;
         const dependFechas = depFechasRaw !== false; 
+        
+        const pageContext = context.mode as any;
+        const projectId = pageContext.contextInfo?.entityId || "";
         
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
@@ -74,8 +76,9 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "2.0.0", // Actualizado aquí
+            version: "2.2.8",
             dependenciaFechas: dependFechas, 
+            projectId: projectId, 
             context: context, 
             onOpenTask: (etn, id) => {
                 const nav = context.navigation as any;
