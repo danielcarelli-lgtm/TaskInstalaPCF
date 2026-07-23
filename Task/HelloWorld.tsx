@@ -102,7 +102,6 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                     {!loading && visibleLines.length === 0 && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>No hay líneas.</div>}
                     
                     {!loading && visibleLines.map(line => {
-                        // RESTRICCIÓN: Solo se pueden asignar materiales si su estado es Pendiente (909540000)
                         const isDraggable = filter === 'unassigned' && line.rawStatus === 909540000;
                         
                         const onDragStart = (e: React.DragEvent) => {
@@ -120,7 +119,7 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                         else if (line.rawStatus === 909540002) statusClass = "prod-status-dev";
 
                         return (
-                            <div key={line.id} className={`prod-card ${!isDraggable && filter === 'unassigned' ? 'not-draggable' : ''}`} draggable={isDraggable} onDragStart={onDragStart} title={isDraggable ? "Arrastrar a tarea hija" : (filter === 'unassigned' ? "Solo los materiales Pendientes se pueden asignar" : "")}>
+                            <div key={line.id} className={`prod-card ${!isDraggable && filter === 'unassigned' ? 'not-draggable' : ''}`} draggable={isDraggable} onDragStart={onDragStart} title={isDraggable ? "Arrastrar a tarea" : (filter === 'unassigned' ? "Solo los materiales Pendientes se pueden asignar" : "")}>
                                 <div className="card-title">{line.productName}</div>
                                 <div className="card-sub">{line.name}</div>
                                 <div className="card-id">ID: {line.productNumber || 'N/A'}</div>
@@ -133,11 +132,9 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                                 )}
                                 
                                 <div className="card-actions">
-                                    {/* RESTRICCIÓN: Solo se puede Liberar si está pendiente (909540000) */}
                                     {filter === 'assigned' && line.rawStatus === 909540000 && (
                                         <button className="btn-release" onClick={() => onUnassign(line.id)}>Liberar</button>
                                     )}
-                                    {/* RESTRICCIÓN: Botón "Instalar" solo para estado pendiente */}
                                     {line.rawStatus === 909540000 && (
                                         <button className="btn-install" onClick={() => onUpdateStatus(line.id, 909540001)}>Instalar</button>
                                     )}
@@ -239,7 +236,12 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
                 if (this.props.allTasks.some(t => t.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
                 this.props.onDropAction(draggedId, this.props.task.id);
             } else if (parsed.type === 'product') {
-                if (Number.isInteger(this.props.task.virtualNro)) { alert("⚠️ Acción Denegada: Solo se pueden asignar materiales a tareas hijas."); return; }
+                // MODIFICACIÓN: Permitir soltar si la tarea NO tiene subtareas (independientemente de si es hija o no)
+                const hasChildren = this.props.allTasks.some(t => t.parentId === this.props.task.id);
+                if (hasChildren) { 
+                    alert("⚠️ Acción Denegada: No se pueden asignar materiales a tareas que contienen subtareas."); 
+                    return; 
+                }
                 this.props.onAssignProduct(parsed.id, this.props.task.id);
             }
         } catch (err) {
@@ -257,7 +259,6 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
         const isParent = Number.isInteger(task.virtualNro);
         const availableDependencies = allTasks.filter(candidate => candidate.id !== task.id && candidate.depId !== task.id);
         
-        // Agrupación segura para Tooltip de Productos garantizando que id siempre sea un string
         const taskProducts = products.filter(p => p.taskId === task.id);
         const hasProducts = taskProducts.length > 0;
         
@@ -410,7 +411,12 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 if (tasks.some((x:any) => x.parentId === draggedId)) { alert("🛑 Acción Denegada: La tarea tiene subtareas."); return; }
                                 onReparentTask(draggedId, t.id);
                             } else if (parsed.type === 'product') {
-                                if (!isChild) { alert("⚠️ Acción Denegada: Solo se pueden asignar materiales a tareas hijas."); return; }
+                                // MODIFICACIÓN: Permitir soltar si la tarea NO tiene subtareas
+                                const hasChildren = tasks.some((x:any) => x.parentId === t.id);
+                                if (hasChildren) { 
+                                    alert("⚠️ Acción Denegada: No se pueden asignar materiales a tareas que contienen subtareas."); 
+                                    return; 
+                                }
                                 onAssignProduct(parsed.id, t.id);
                             }
                         } catch (err) { }
@@ -762,7 +768,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="header-actions">
                     <button className="btn-new" onClick={this.props.onCreateTask}>+ Crear Tarea</button>
                     <button className="btn-excel" onClick={this.handleExportExcel} title="Descargar CSV">📊 Excel</button>
-                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra materiales hacia las tareas hijas.</span>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>💡 Arrastra materiales hacia las tareas.</span>
                     
                     <div className="view-toggle-container">
                         <button className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'grid' })}>Lista</button>

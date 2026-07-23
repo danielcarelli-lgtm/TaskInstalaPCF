@@ -1,12 +1,14 @@
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
 
+/* Anclaje estricto del PCF para evitar que empuje los límites de Dynamics */
 .pcf-container { 
     background-color: #ffffff; 
     font-family: 'Segoe UI', sans-serif; 
     width: 100%; height: 100%;
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     display: flex; flex-direction: column;
     box-sizing: border-box;
-    position: relative; 
 }
 
 .layout-split {
@@ -14,6 +16,8 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     flex-grow: 1;
     overflow: hidden;
     width: 100%;
+    min-height: 0;
+    height: 100%; /* Límite de altura añadido */
 }
 
 .main-content {
@@ -21,6 +25,8 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
+    height: 100%; /* Límite de altura añadido */
 }
 
 /* === PANEL DE PRODUCTOS COMPACTO === */
@@ -32,6 +38,8 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     flex-direction: column;
     overflow: hidden;
     flex-shrink: 0;
+    min-height: 0;
+    height: 100%; /* Límite de altura añadido */
 }
 
 .panel-header {
@@ -41,12 +49,14 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     color: #323130;
     border-bottom: 1px solid #e0e0e0;
     background: #fff;
+    flex-shrink: 0;
 }
 
 .switch-container {
     display: flex;
     padding: 10px 15px;
     gap: 0;
+    flex-shrink: 0;
 }
 
 .btn-switch {
@@ -65,6 +75,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-switch:last-child { border-radius: 0 4px 4px 0; border-left: none; }
 .btn-switch.active { background: #0078d4; color: white; }
 
+/* FIX DEL SCROLL DEL CONTENEDOR DE TARJETAS */
 .card-container {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -72,6 +83,9 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     padding: 10px;
     overflow-y: auto;
     align-content: start;
+    flex-grow: 1;
+    min-height: 0;
+    height: 0; /* TRUCO: Fuerza el cálculo del contenedor dentro de Flexbox */
 }
 
 .prod-card {
@@ -167,7 +181,16 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .gh-cell { font-weight: 600; font-size: 11px; color: #201f1e; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; box-sizing: border-box; }
 
 /* === GRID BODY === */
-.grid-body { flex-grow: 1; overflow-y: auto; overflow-x: auto; width: 100%; }
+/* FIX DEL SCROLL DEL CUERPO DE LA TABLA */
+.grid-body { 
+    flex-grow: 1; 
+    overflow-y: auto; 
+    overflow-x: auto; 
+    width: 100%; 
+    min-height: 0; 
+    height: 0; 
+}
+
 .grid-row { display: flex; width: fit-content; min-width: 100%; height: 25px; align-items: center; border-bottom: 1px solid #edebe9; box-sizing: border-box; transition: background-color 0.2s; }
 .grid-row:hover { background-color: #eff6fc; }
 .row-drag-over { background-color: #c7e0f4 !important; border: 2px dashed #0078d4; }
@@ -179,7 +202,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 /* COLUMNAS CON ANCHOS FIJOS PROTEGIDOS */
 .w-nro { width: 45px; text-align: center; color: #888; font-weight: bold; border-right: 1px solid #f3f2f1; }
 
-/* NUEVA COLUMNA DE PRODUCTO / TOOLTIP */
+/* COLUMNA DE PRODUCTO / TOOLTIP */
 .w-prod { width: 35px; text-align: center; overflow: visible !important; border-right: 1px solid #f3f2f1; }
 .prod-count-wrapper { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; line-height: 1.1; cursor: default; }
 .prod-count-wrapper:hover .prod-tooltip { display: block; }
