@@ -17,7 +17,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     overflow: hidden;
     width: 100%;
     min-height: 0;
-    height: 100%; /* Límite de altura añadido */
+    height: 100%;
 }
 
 .main-content {
@@ -26,7 +26,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
-    height: 100%; /* Límite de altura añadido */
+    height: 100%;
 }
 
 /* === PANEL DE PRODUCTOS COMPACTO === */
@@ -39,7 +39,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     overflow: hidden;
     flex-shrink: 0;
     min-height: 0;
-    height: 100%; /* Límite de altura añadido */
+    height: 100%;
 }
 
 .panel-header {
@@ -75,7 +75,29 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-switch:last-child { border-radius: 0 4px 4px 0; border-left: none; }
 .btn-switch.active { background: #0078d4; color: white; }
 
-/* FIX DEL SCROLL DEL CONTENEDOR DE TARJETAS */
+/* === BUSCADOR DE PRODUCTOS === */
+.search-container {
+    padding: 5px 15px 10px 15px;
+    background: #f3f2f1;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 11px;
+    box-sizing: border-box;
+    outline: none;
+    font-family: inherit;
+}
+
+.search-input:focus {
+    border-color: #0078d4;
+}
+
 .card-container {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -85,7 +107,7 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
     align-content: start;
     flex-grow: 1;
     min-height: 0;
-    height: 0; /* TRUCO: Fuerza el cálculo del contenedor dentro de Flexbox */
+    height: 0; 
 }
 
 .prod-card {
@@ -163,6 +185,10 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .btn-excel { background-color: #107c10; color: white; border: none; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; margin-left: 8px; }
 .btn-excel:hover { background-color: #0b5a0b; }
 
+/* Botón Refrescar */
+.btn-refresh { background-color: #f3f2f1; color: #323130; border: 1px solid #d2d0ce; padding: 6px 12px; font-size: 12px; cursor: pointer; border-radius: 2px; margin-left: 8px; font-weight: 600; transition: background 0.2s; }
+.btn-refresh:hover { background-color: #edebe9; }
+
 /* === BOTONES VIEW TOGGLE === */
 .view-toggle-container { margin-left: auto; display: flex; background: #f3f2f1; border-radius: 4px; padding: 2px; }
 .zoom-toggle-container { margin-left: 15px; margin-right: 40px; display: flex; background: #f3f2f1; border-radius: 4px; padding: 2px; }
@@ -181,7 +207,6 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 .gh-cell { font-weight: 600; font-size: 11px; color: #201f1e; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.5px; box-sizing: border-box; }
 
 /* === GRID BODY === */
-/* FIX DEL SCROLL DEL CUERPO DE LA TABLA */
 .grid-body { 
     flex-grow: 1; 
     overflow-y: auto; 

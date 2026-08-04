@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.10" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
+  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.14" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
     
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />
@@ -26,6 +26,9 @@
     <resources>
       <code path="index.ts" order="1"/>
       <css path="css/Task.css" order="2" />
+      <resx path="strings/TaskControl.1033.resx" version="1.0.0" />
+      <resx path="strings/TaskControl.3082.resx" version="1.0.0" />
+      <resx path="strings/TaskControl.2070.resx" version="1.0.0" />
     </resources>
   </control>
 </manifest>

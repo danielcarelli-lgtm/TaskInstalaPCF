@@ -18,6 +18,8 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
         
         const pageContext = context.mode as any;
         const projectId = pageContext.contextInfo?.entityId || "";
+
+        const t = (key: string, fallback: string) => context.resources.getString(key) || fallback;
         
         let rawItems: ITaskItem[] = (ds.sortedRecordIds || []).map((id) => {
             const record = ds.records[id] as any;
@@ -76,10 +78,11 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "2.2.9",
+            version: "2.2.14",
             dependenciaFechas: dependFechas, 
             projectId: projectId, 
-            context: context, 
+            context: context,
+            onRefresh: () => { ds.refresh(); },
             onOpenTask: (etn, id) => {
                 const nav = context.navigation as any;
                 if (nav.navigateTo) {
@@ -100,15 +103,15 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
             },
             onUpdateProgreso: (id, val) => { 
                 const data = { "sec_progreso": val };
-                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error progreso: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Progress", "Error progreso: ") + err.message }); });
             },
             onReparentTask: (childId, newParentId) => {
                 const data = { "sec_tareaprincipalid@odata.bind": `/sec_tareas(${newParentId})` };
-                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Generic", "Error: ") + err.message }); });
             },
             onUnparentTask: (childId) => {
                 const data = { "sec_tareaprincipalid": null };
-                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", childId, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Generic", "Error: ") + err.message }); });
             },
             onUpdateDependency: (taskId, dependencyId) => {
                 let data: any = {};
@@ -118,7 +121,7 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
                 } else {
                     data["sec_dependenciaid"] = null;
                 }
-                context.webAPI.updateRecord("sec_tarea", taskId, data).then(() => { console.log("OK"); }, (err) => { context.navigation.openErrorDialog({ message: "Error dependencia: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", taskId, data).then(() => { console.log("OK"); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Dependency", "Error dependencia: ") + err.message }); });
             },
             onUpdateItemDates: (id, start, end) => {
                 const formatDate = (d: Date) => {
@@ -126,7 +129,7 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
                     return `${year}-${month}-${day}`;
                 };
                 const data = { "sec_inicio": formatDate(start), "sec_fin": formatDate(end) };
-                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error fechas: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Dates", "Error fechas: ") + err.message }); });
             },
             onUpdateParentRollup: (id, start, end, esfuerzo, imputadas, progreso) => {
                 const formatDate = (d: Date) => {
@@ -140,7 +143,7 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
                     "sec_horasimputadas": imputadas,
                     "sec_progreso": progreso
                 };
-                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: "Error sincronizando rollup: " + err.message }); });
+                context.webAPI.updateRecord("sec_tarea", id, data).then(() => { ds.refresh(); }, (err) => { context.navigation.openErrorDialog({ message: t("Err_Rollup", "Error sincronizando rollup: ") + err.message }); });
             }
         };
         
