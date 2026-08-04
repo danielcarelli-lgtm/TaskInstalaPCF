@@ -68,4 +68,5 @@
   <data name="Lbl_NoUsers"><value>Nenhum utilizador encontrado.</value></data>
   <data name="Lbl_DragUser"><value>Arrastar para a tarefa</value></data>
   <data name="Err_AssignUser"><value>Erro ao atribuir utilizador: </value></data>
+  <data name="Alert_UserAlreadyAssigned"><value>⚠️ O utilizador já está atribuído a esta tarefa.</value></data>
 </root>

@@ -293,6 +293,7 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
     }
     private fetchMembers = () => {
         this.setState({ loading: true });
+        // Para el facepile el cache no es un problema crítico, pero podemos asegurar su frescura de la misma forma si fuera necesario.
         const fetchXml = `
         <fetch version="1.0" mapping="logical" no-lock="false" distinct="true">
             <entity name="sec_miembrodelequipo">
@@ -303,7 +304,11 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
                 </filter>
             </entity>
         </fetch>`;
-        const query = `?fetchXml=${encodeURIComponent(fetchXml)}`;
+        
+        // Aquí añadimos también un parámetro dinámico en el XML para evitar la cache del facepile
+        const cacheBusterXml = fetchXml.replace('</filter>', `<condition attribute="sec_name" operator="ne" value="cb_${Date.now()}"/>\n</filter>`);
+        
+        const query = `?fetchXml=${encodeURIComponent(cacheBusterXml)}`;
         this.props.webAPI.retrieveMultipleRecords("sec_miembrodelequipo", query).then(
             (result: any) => {
                 const names = result.entities.map((e: any) => e.sec_name);
@@ -581,6 +586,7 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
 // === COMPONENTE PRINCIPAL ===
 export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldState> {
     private GanttTableWrapper: React.FC<any>;
+    private pendingUserAssignments = new Set<string>();
 
     constructor(props: IHelloWorldProps) {
         super(props);
@@ -689,21 +695,58 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
     }
 
     private handleAssignUser = (userId: string, userName: string, taskId: string) => {
-        const data: any = {
-            "sec_name": userName,
-            "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${taskId})`,
-            "sec_usuarioid@odata.bind": `/systemusers(${userId})`
-        };
+        const cleanUserId = userId.replace(/[{}]/g, '');
+        const cleanTaskId = taskId.replace(/[{}]/g, '');
+        
+        const assignKey = `${cleanUserId}_${cleanTaskId}`;
+        
+        if (this.pendingUserAssignments.has(assignKey)) return;
+        this.pendingUserAssignments.add(assignKey);
 
-        if (this.props.projectId) {
-            data["sec_proyectoid@odata.bind"] = `/sec_proyectos(${this.props.projectId})`;
-        }
+        const fetchXml = `
+        <fetch version="1.0" mapping="logical" no-lock="true" top="1">
+            <entity name="sec_miembrodelequipo">
+                <attribute name="sec_miembrodelequipoid"/>
+                <filter type="and">
+                    <condition attribute="sec_usuarioid" operator="eq" value="${cleanUserId}"/>
+                    <condition attribute="sec_tareadeproyectoid" operator="eq" value="${cleanTaskId}"/>
+                    <condition attribute="statecode" operator="eq" value="0"/>
+                    <condition attribute="sec_name" operator="ne" value="cachebust_${Date.now()}"/>
+                </filter>
+            </entity>
+        </fetch>`;
 
-        this.props.context.webAPI.createRecord("sec_miembrodelequipo", data)
-        .then(() => {
-            this.setState({ teamRefreshTrigger: Date.now() });
-        }, (err) => {
-            this.props.context.navigation.openErrorDialog({ message: this.t("Err_AssignUser", "Error asignando usuario: ") + err.message });
+        const query = `?fetchXml=${encodeURIComponent(fetchXml)}`;
+
+        this.props.context.webAPI.retrieveMultipleRecords("sec_miembrodelequipo", query)
+        .then((res: any) => {
+            if (res.entities && res.entities.length > 0) {
+                this.pendingUserAssignments.delete(assignKey);
+                alert(this.t("Alert_UserAlreadyAssigned", "⚠️ El usuario ya está asignado a esta tarea."));
+                return;
+            }
+
+            const data: any = {
+                "sec_name": userName,
+                "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${cleanTaskId})`,
+                "sec_usuarioid@odata.bind": `/systemusers(${cleanUserId})`
+            };
+
+            if (this.props.projectId) {
+                data["sec_proyectoid@odata.bind"] = `/sec_proyectos(${this.props.projectId.replace(/[{}]/g, '')})`;
+            }
+
+            this.props.context.webAPI.createRecord("sec_miembrodelequipo", data)
+            .then(() => {
+                this.pendingUserAssignments.delete(assignKey);
+                this.setState({ teamRefreshTrigger: Date.now() });
+            }, (err) => {
+                this.pendingUserAssignments.delete(assignKey);
+                this.props.context.navigation.openErrorDialog({ message: this.t("Err_AssignUser", "Error asignando usuario: ") + err.message });
+            });
+        }, (err: any) => {
+            this.pendingUserAssignments.delete(assignKey);
+            this.props.context.navigation.openErrorDialog({ message: this.t("Err_AssignUser", "Error validando usuario: ") + err.message });
         });
     }
 
@@ -947,7 +990,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                         <button className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'grid' })}>{this.t("Btn_List", "Lista")}</button>
                         <button className={`btn-view ${activeView === 'gantt' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'gantt' })}>{this.t("Btn_Gantt", "Gantt")}</button>
                         
-                        {/* Botones de Paneles Laterales */}
                         <button className={`btn-view ${isTeamOpen ? 'active-team' : ''}`} style={{marginLeft:'10px'}} onClick={() => this.setState({ isTeamOpen: !isTeamOpen, isProductsOpen: false })}>
                             {this.t("Btn_Team", "👥 Equipo")}
                         </button>

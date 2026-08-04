@@ -68,4 +68,5 @@
   <data name="Lbl_NoUsers"><value>No se encontraron usuarios.</value></data>
   <data name="Lbl_DragUser"><value>Arrastrar a tarea</value></data>
   <data name="Err_AssignUser"><value>Error asignando usuario: </value></data>
+  <data name="Alert_UserAlreadyAssigned"><value>⚠️ El usuario ya está asignado a esta tarea.</value></data>
 </root>

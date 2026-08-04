@@ -68,4 +68,5 @@
   <data name="Lbl_NoUsers"><value>No users found.</value></data>
   <data name="Lbl_DragUser"><value>Drag to task</value></data>
   <data name="Err_AssignUser"><value>Error assigning user: </value></data>
+  <data name="Alert_UserAlreadyAssigned"><value>⚠️ The user is already assigned to this task.</value></data>
 </root>
