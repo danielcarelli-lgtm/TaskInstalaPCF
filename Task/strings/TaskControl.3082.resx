@@ -32,7 +32,7 @@
   <data name="Btn_NewTask"><value>+ Crear Tarea</value></data>
   <data name="Btn_Refresh"><value>🔄 Refrescar</value></data>
   <data name="Tooltip_RefreshAll"><value>Recargar todos los datos</value></data>
-  <data name="Msg_DragHint"><value>💡 Arrastra materiales hacia las tareas.</value></data>
+  <data name="Msg_DragHint"><value>💡 Arrastra materiales o usuarios hacia las tareas.</value></data>
   <data name="Btn_List"><value>Lista</value></data>
   <data name="Btn_Gantt"><value>Gantt</value></data>
   <data name="Btn_Products"><value>📦 Productos</value></data>
@@ -43,7 +43,7 @@
   <data name="Msg_NoTasksExport"><value>No hay tareas para exportar.</value></data>
   <data name="Alert_DenyGrandchild"><value>⚠️ Acción Denegada: No aceptamos 'nietos'.</value></data>
   <data name="Alert_DenyHasChildren"><value>🛑 Acción Denegada: La tarea tiene subtareas.</value></data>
-  <data name="Alert_DenyAssignParent"><value>⚠️ Acción Denegada: No se pueden asignar materiales a tareas que contienen subtareas.</value></data>
+  <data name="Alert_DenyAssignParent"><value>⚠️ Acción Denegada: No se pueden asignar recursos a tareas que contienen subtareas.</value></data>
   <data name="Err_Security"><value>Aviso de Seguridad</value></data>
   <data name="Err_SecurityMsg"><value>Se ha evitado el cuelgue de la vista. Error reportado: </value></data>
   <data name="Btn_BackToList"><value>Volver a la Lista</value></data>
@@ -61,4 +61,11 @@
   <data name="Lbl_NA"><value>N/A</value></data>
   <data name="Btn_Excel"><value>📊 Excel</value></data>
   <data name="Tooltip_Excel"><value>Descargar CSV</value></data>
+  <data name="Lbl_TeamPanel"><value>Usuarios</value></data>
+  <data name="Btn_Team"><value>👥 Equipo</value></data>
+  <data name="Search_User_Placeholder"><value>Buscar usuario o email...</value></data>
+  <data name="Lbl_LoadingUsers"><value>Cargando usuarios...</value></data>
+  <data name="Lbl_NoUsers"><value>No se encontraron usuarios.</value></data>
+  <data name="Lbl_DragUser"><value>Arrastrar a tarea</value></data>
+  <data name="Err_AssignUser"><value>Error asignando usuario: </value></data>
 </root>

@@ -32,6 +32,12 @@ export interface IProductLine {
     productNumber?: string;
 }
 
+export interface ISystemUser {
+    id: string;
+    fullname: string;
+    email: string;
+}
+
 export interface IHelloWorldProps { 
     tasks: ITaskItem[]; 
     version: string;
@@ -56,13 +62,110 @@ interface IHelloWorldState {
     hasError: boolean;
     errorMsg: string;
     isProductsOpen: boolean;
+    isTeamOpen: boolean;
     productRefreshTrigger: number;
+    teamRefreshTrigger: number;
     products: IProductLine[];
     productsLoading: boolean;
 }
 
 // === FUNCIÓN DE TRADUCCIÓN ===
 type TranslateFn = (key: string, fallback: string) => string;
+
+// === PANEL DE USUARIOS (EQUIPO) ===
+interface ITeamPanelProps { 
+    webAPI: ComponentFramework.WebApi;
+    t: TranslateFn;
+}
+interface ITeamPanelState { users: ISystemUser[]; loading: boolean; searchQuery: string; }
+
+class TeamPanel extends React.Component<ITeamPanelProps, ITeamPanelState> {
+    constructor(props: ITeamPanelProps) {
+        super(props);
+        this.state = { users: [], loading: true, searchQuery: '' };
+    }
+
+    componentDidMount() {
+        const fetchXml = `
+        <fetch version="1.0" output-format="xml-platform" mapping="logical" distinct="false">
+          <entity name="systemuser">
+            <attribute name="fullname" />
+            <attribute name="systemuserid" />
+            <attribute name="windowsliveid" />
+            <order attribute="fullname" descending="false" />
+            <filter type="and">
+              <condition attribute="isdisabled" operator="eq" value="0" />
+              <condition attribute="windowsliveid" operator="like" value="%@securitas.es" />
+            </filter>
+          </entity>
+        </fetch>`;
+
+        const query = `?fetchXml=${encodeURIComponent(fetchXml)}`;
+        this.props.webAPI.retrieveMultipleRecords("systemuser", query).then(
+            (result: any) => {
+                const fetchedUsers: ISystemUser[] = result.entities.map((e: any) => ({
+                    id: e.systemuserid,
+                    fullname: e.fullname || '',
+                    email: e.windowsliveid || ''
+                }));
+                this.setState({ users: fetchedUsers, loading: false });
+            },
+            (error: any) => {
+                console.error("Error cargando usuarios:", error);
+                this.setState({ loading: false });
+            }
+        );
+    }
+
+    render() {
+        const { t } = this.props;
+        const { users, loading, searchQuery } = this.state;
+        
+        const query = searchQuery.toLowerCase();
+        const visibleUsers = users.filter(u => {
+            if (!query) return true;
+            return (
+                (u.fullname.toLowerCase().includes(query)) ||
+                (u.email.toLowerCase().includes(query))
+            );
+        });
+
+        return (
+            <div className="products-panel">
+                <div className="panel-header">{t("Lbl_TeamPanel", "Usuarios")}</div>
+                
+                <div className="search-container">
+                    <input 
+                        type="text" 
+                        className="search-input" 
+                        placeholder={t("Search_User_Placeholder", "Buscar usuario o email...")}
+                        value={this.state.searchQuery} 
+                        onChange={(e) => this.setState({ searchQuery: e.target.value })} 
+                    />
+                </div>
+                
+                <div className="card-container">
+                    {loading && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_LoadingUsers", "Cargando usuarios...")}</div>}
+                    {!loading && visibleUsers.length === 0 && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_NoUsers", "No se encontraron usuarios.")}</div>}
+                    
+                    {!loading && visibleUsers.map(user => {
+                        const onDragStart = (e: React.DragEvent) => {
+                            e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'user', id: user.id, name: user.fullname }));
+                            e.dataTransfer.effectAllowed = "copyMove";
+                        };
+
+                        return (
+                            <div key={user.id} className="prod-card" draggable onDragStart={onDragStart} title={t("Lbl_DragUser", "Arrastrar a tarea")}>
+                                <div className="card-title">{user.fullname}</div>
+                                <div className="card-sub">{user.email}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+}
 
 // === PANEL LATERAL DE PRODUCTOS ===
 interface IProductPanelProps { 
@@ -175,7 +278,7 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
 }
 
 // === FACEPILE ===
-interface IMemberFacepileProps { taskId: string, webAPI: ComponentFramework.WebApi, t: TranslateFn }
+interface IMemberFacepileProps { taskId: string, webAPI: ComponentFramework.WebApi, refreshTrigger: number, t: TranslateFn }
 interface IMemberFacepileState { members: string[], loading: boolean }
 class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepileState> {
     constructor(props: IMemberFacepileProps) {
@@ -184,7 +287,9 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
     }
     componentDidMount() { this.fetchMembers(); }
     componentDidUpdate(prevProps: IMemberFacepileProps) {
-        if (prevProps.taskId !== this.props.taskId) this.fetchMembers();
+        if (prevProps.taskId !== this.props.taskId || prevProps.refreshTrigger !== this.props.refreshTrigger) {
+            this.fetchMembers();
+        }
     }
     private fetchMembers = () => {
         this.setState({ loading: true });
@@ -230,7 +335,9 @@ interface ITaskRowProps {
     onToggle: (id: string) => void, onOpen: (etn: string, id: string) => void, webAPI: ComponentFramework.WebApi,
     onDropAction: (draggedId: string, targetId: string) => void, 
     onAssignProduct: (productId: string, taskId: string) => void,
+    onAssignUser: (userId: string, userName: string, taskId: string) => void,
     onUnparentAction: (id: string) => void, onUpdateDep: (taskId: string, depId: string | null) => void,
+    teamRefreshTrigger: number,
     t: TranslateFn
 }
 interface ITaskRowState { isDragOver: boolean, localDepId: string }
@@ -262,13 +369,18 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
                 if (this.props.task.parentId) { alert(this.props.t("Alert_DenyGrandchild", "⚠️ Acción Denegada: No aceptamos 'nietos'.")); return; }
                 if (this.props.allTasks.some(t => t.parentId === draggedId)) { alert(this.props.t("Alert_DenyHasChildren", "🛑 Acción Denegada: La tarea tiene subtareas.")); return; }
                 this.props.onDropAction(draggedId, this.props.task.id);
-            } else if (parsed.type === 'product') {
+            } else if (parsed.type === 'product' || parsed.type === 'user') {
                 const hasChildren = this.props.allTasks.some(t => t.parentId === this.props.task.id);
                 if (hasChildren) { 
-                    alert(this.props.t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar materiales a tareas que contienen subtareas.")); 
+                    alert(this.props.t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar recursos a tareas que contienen subtareas.")); 
                     return; 
                 }
-                this.props.onAssignProduct(parsed.id, this.props.task.id);
+                
+                if (parsed.type === 'product') {
+                    this.props.onAssignProduct(parsed.id, this.props.task.id);
+                } else if (parsed.type === 'user') {
+                    this.props.onAssignUser(parsed.id, parsed.name, this.props.task.id);
+                }
             }
         } catch (err) { }
     };
@@ -279,7 +391,7 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
     };
     
     render() {
-        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, products, t } = this.props;
+        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, products, teamRefreshTrigger, t } = this.props;
         const isParent = Number.isInteger(task.virtualNro);
         const availableDependencies = allTasks.filter(candidate => candidate.id !== task.id && candidate.depId !== task.id);
         
@@ -346,7 +458,7 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
                     {!isParent && <span className="child-indicator unbind-btn" style={{ marginLeft: '14px' }} onClick={this.handleUnparentClick} title={t("Tooltip_Unbind", "Desvincular")}>↳</span>}
                     <a className="link-name" onClick={() => onOpen(task.entityName, task.id)} style={{ fontWeight: isParent ? 'bold' : 'normal' }}>{task.nombre}</a>
                 </div>
-                <div className="gd-cell w-members"><MemberFacepile taskId={task.id} webAPI={webAPI} t={t} /></div>
+                <div className="gd-cell w-members"><MemberFacepile taskId={task.id} webAPI={webAPI} refreshTrigger={teamRefreshTrigger} t={t} /></div>
                 <div className="gd-cell w-date">{task.inicio}</div>
                 <div className="gd-cell w-date">{task.fin}</div>
                 <div className="gd-cell w-dep">
@@ -406,7 +518,7 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
     constructor(props: any) { super(props); this.state = { dragOverId: null }; }
     render() {
         const { rowHeight, tasks: ganttViewTasks, fontFamily, fontSize } = this.props.ganttProps;
-        const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onUnparentTask, t } = this.props;
+        const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onAssignUser, onUnparentTask, teamRefreshTrigger, t } = this.props;
 
         return (
             <div style={{ fontFamily, fontSize }}>
@@ -434,13 +546,18 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 if (originalTask && originalTask.parentId) { alert(t("Alert_DenyGrandchild", "⚠️ Acción Denegada: No aceptamos 'nietos'.")); return; }
                                 if (tasks.some((x:any) => x.parentId === draggedId)) { alert(t("Alert_DenyHasChildren", "🛑 Acción Denegada: La tarea tiene subtareas.")); return; }
                                 onReparentTask(draggedId, tItem.id);
-                            } else if (parsed.type === 'product') {
+                            } else if (parsed.type === 'product' || parsed.type === 'user') {
                                 const hasChildren = tasks.some((x:any) => x.parentId === tItem.id);
                                 if (hasChildren) { 
-                                    alert(t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar materiales a tareas que contienen subtareas.")); 
+                                    alert(t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar recursos a tareas que contienen subtareas.")); 
                                     return; 
                                 }
-                                onAssignProduct(parsed.id, tItem.id);
+
+                                if (parsed.type === 'product') {
+                                    onAssignProduct(parsed.id, tItem.id);
+                                } else if (parsed.type === 'user') {
+                                    onAssignUser(parsed.id, parsed.name, tItem.id);
+                                }
                             }
                         } catch (err) { }
                     };
@@ -452,7 +569,7 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 {isChild && <span className="child-indicator unbind-btn" style={{ marginLeft: '24px' }} onClick={(e) => { e.stopPropagation(); onUnparentTask(tItem.id); }} title={t("Tooltip_Unbind", "Desvincular")}>↳</span>}
                                 <a className="link-name" onClick={() => { if(originalTask) onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: !isChild ? 'bold' : 'normal' }}>{tItem.name}</a>
                             </div>
-                            <div className="gd-cell w-members"><MemberFacepile taskId={tItem.id} webAPI={webAPI} t={t} /></div>
+                            <div className="gd-cell w-members"><MemberFacepile taskId={tItem.id} webAPI={webAPI} refreshTrigger={teamRefreshTrigger} t={t} /></div>
                         </div>
                     );
                 })}
@@ -474,7 +591,9 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             hasError: false,
             errorMsg: "",
             isProductsOpen: false,
+            isTeamOpen: false,
             productRefreshTrigger: 0,
+            teamRefreshTrigger: 0,
             products: [],
             productsLoading: false
         };
@@ -483,9 +602,9 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
         this.GanttTableWrapper = (ganttProps: any) => (
             <CustomGanttTable 
-                ganttProps={ganttProps} tasks={this.props.tasks} webAPI={this.props.context.webAPI} t={translateFn}
+                ganttProps={ganttProps} tasks={this.props.tasks} webAPI={this.props.context.webAPI} t={translateFn} teamRefreshTrigger={this.state.teamRefreshTrigger}
                 onOpenTask={this.props.onOpenTask} onReparentTask={this.props.onReparentTask} onUnparentTask={this.props.onUnparentTask}
-                onAssignProduct={this.handleAssignProduct}
+                onAssignProduct={this.handleAssignProduct} onAssignUser={this.handleAssignUser}
             />
         );
     }
@@ -513,7 +632,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
     private handleRefreshAll = () => {
         this.props.onRefresh();
-        this.setState({ productRefreshTrigger: Date.now() });
+        this.setState({ productRefreshTrigger: Date.now(), teamRefreshTrigger: Date.now() });
     }
 
     private fetchProducts = () => {
@@ -567,6 +686,25 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 this.setState({ productsLoading: false }); 
             }
         );
+    }
+
+    private handleAssignUser = (userId: string, userName: string, taskId: string) => {
+        const data: any = {
+            "sec_name": userName,
+            "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${taskId})`,
+            "sec_usuarioid@odata.bind": `/systemusers(${userId})`
+        };
+
+        if (this.props.projectId) {
+            data["sec_proyectoid@odata.bind"] = `/sec_proyectos(${this.props.projectId})`;
+        }
+
+        this.props.context.webAPI.createRecord("sec_miembrodelequipo", data)
+        .then(() => {
+            this.setState({ teamRefreshTrigger: Date.now() });
+        }, (err) => {
+            this.props.context.navigation.openErrorDialog({ message: this.t("Err_AssignUser", "Error asignando usuario: ") + err.message });
+        });
     }
 
     private handleUnassignProduct = (productId: string) => {
@@ -721,7 +859,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
     public render(): React.ReactNode {
         const { tasks, dependenciaFechas, projectId, context } = this.props;
-        const { activeView, ganttViewMode, isProductsOpen, products, productsLoading } = this.state;
+        const { activeView, ganttViewMode, isProductsOpen, isTeamOpen, products, productsLoading, teamRefreshTrigger } = this.state;
 
         if (this.state.hasError) {
             return (
@@ -803,13 +941,17 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                     <button className="btn-excel" onClick={this.handleExportExcel} title={this.t("Tooltip_Excel", "Descargar CSV")}>{this.t("Btn_Excel", "📊 Excel")}</button>
                     <button className="btn-refresh" onClick={this.handleRefreshAll} title={this.t("Tooltip_RefreshAll", "Recargar todos los datos")}>{this.t("Btn_Refresh", "🔄 Refrescar")}</button>
                     
-                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>{this.t("Msg_DragHint", "💡 Arrastra materiales hacia las tareas.")}</span>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>{this.t("Msg_DragHint", "💡 Arrastra materiales o usuarios hacia las tareas.")}</span>
                     
                     <div className="view-toggle-container">
                         <button className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'grid' })}>{this.t("Btn_List", "Lista")}</button>
                         <button className={`btn-view ${activeView === 'gantt' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'gantt' })}>{this.t("Btn_Gantt", "Gantt")}</button>
                         
-                        <button className={`btn-view ${isProductsOpen ? 'active-prod' : ''}`} style={{marginLeft:'10px'}} onClick={() => this.setState({ isProductsOpen: !isProductsOpen })}>
+                        {/* Botones de Paneles Laterales */}
+                        <button className={`btn-view ${isTeamOpen ? 'active-team' : ''}`} style={{marginLeft:'10px'}} onClick={() => this.setState({ isTeamOpen: !isTeamOpen, isProductsOpen: false })}>
+                            {this.t("Btn_Team", "👥 Equipo")}
+                        </button>
+                        <button className={`btn-view ${isProductsOpen ? 'active-prod' : ''}`} onClick={() => this.setState({ isProductsOpen: !isProductsOpen, isTeamOpen: false })}>
                             {this.t("Btn_Products", "📦 Productos")}
                         </button>
                     </div>
@@ -845,7 +987,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                                     {visibleTasks.map((task) => (
                                         <TaskRow key={task.id} task={task} allTasks={this.props.tasks} products={products} isCollapsed={this.state.collapsedParents.includes(task.id)} onToggle={this.toggleParent}
                                             onOpen={this.props.onOpenTask} webAPI={this.props.context.webAPI} onDropAction={this.props.onReparentTask} onUnparentAction={this.props.onUnparentTask} onUpdateDep={this.props.onUpdateDependency}
-                                            onAssignProduct={this.handleAssignProduct} t={this.t}
+                                            onAssignProduct={this.handleAssignProduct} onAssignUser={this.handleAssignUser} teamRefreshTrigger={teamRefreshTrigger} t={this.t}
                                         />
                                     ))}
                                 </div>
@@ -871,6 +1013,10 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                         )}
                     </div>
                     
+                    {isTeamOpen && (
+                        <TeamPanel webAPI={this.props.context.webAPI} t={this.t} />
+                    )}
+
                     {isProductsOpen && (
                         <ProductPanel 
                             projectId={projectId} 

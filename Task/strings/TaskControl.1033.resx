@@ -32,7 +32,7 @@
   <data name="Btn_NewTask"><value>+ Create Task</value></data>
   <data name="Btn_Refresh"><value>🔄 Refresh</value></data>
   <data name="Tooltip_RefreshAll"><value>Reload all data</value></data>
-  <data name="Msg_DragHint"><value>💡 Drag materials to tasks.</value></data>
+  <data name="Msg_DragHint"><value>💡 Drag materials or users to tasks.</value></data>
   <data name="Btn_List"><value>List</value></data>
   <data name="Btn_Gantt"><value>Gantt</value></data>
   <data name="Btn_Products"><value>📦 Products</value></data>
@@ -43,7 +43,7 @@
   <data name="Msg_NoTasksExport"><value>No tasks to export.</value></data>
   <data name="Alert_DenyGrandchild"><value>⚠️ Denied: Grandchild tasks not allowed.</value></data>
   <data name="Alert_DenyHasChildren"><value>🛑 Denied: Task has subtasks.</value></data>
-  <data name="Alert_DenyAssignParent"><value>⚠️ Denied: Cannot assign materials to tasks with subtasks.</value></data>
+  <data name="Alert_DenyAssignParent"><value>⚠️ Denied: Cannot assign resources to tasks with subtasks.</value></data>
   <data name="Err_Security"><value>Security Warning</value></data>
   <data name="Err_SecurityMsg"><value>View crash prevented. Error reported: </value></data>
   <data name="Btn_BackToList"><value>Back to List</value></data>
@@ -61,4 +61,11 @@
   <data name="Lbl_NA"><value>N/A</value></data>
   <data name="Btn_Excel"><value>📊 Excel</value></data>
   <data name="Tooltip_Excel"><value>Download CSV</value></data>
+  <data name="Lbl_TeamPanel"><value>Users</value></data>
+  <data name="Btn_Team"><value>👥 Team</value></data>
+  <data name="Search_User_Placeholder"><value>Search user or email...</value></data>
+  <data name="Lbl_LoadingUsers"><value>Loading users...</value></data>
+  <data name="Lbl_NoUsers"><value>No users found.</value></data>
+  <data name="Lbl_DragUser"><value>Drag to task</value></data>
+  <data name="Err_AssignUser"><value>Error assigning user: </value></data>
 </root>

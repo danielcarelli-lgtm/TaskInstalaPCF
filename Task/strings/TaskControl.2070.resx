@@ -32,7 +32,7 @@
   <data name="Btn_NewTask"><value>+ Criar Tarefa</value></data>
   <data name="Btn_Refresh"><value>🔄 Atualizar</value></data>
   <data name="Tooltip_RefreshAll"><value>Recarregar todos os dados</value></data>
-  <data name="Msg_DragHint"><value>💡 Arraste materiais para as tarefas.</value></data>
+  <data name="Msg_DragHint"><value>💡 Arraste materiais ou utilizadores para as tarefas.</value></data>
   <data name="Btn_List"><value>Lista</value></data>
   <data name="Btn_Gantt"><value>Gantt</value></data>
   <data name="Btn_Products"><value>📦 Produtos</value></data>
@@ -43,7 +43,7 @@
   <data name="Msg_NoTasksExport"><value>Não há tarefas para exportar.</value></data>
   <data name="Alert_DenyGrandchild"><value>⚠️ Ação Negada: Não aceitamos 'netos'.</value></data>
   <data name="Alert_DenyHasChildren"><value>🛑 Ação Negada: A tarefa tem subtarefas.</value></data>
-  <data name="Alert_DenyAssignParent"><value>⚠️ Ação Negada: Não é possível atribuir materiais a tarefas com subtarefas.</value></data>
+  <data name="Alert_DenyAssignParent"><value>⚠️ Ação Negada: Não é possível atribuir recursos a tarefas com subtarefas.</value></data>
   <data name="Err_Security"><value>Aviso de Segurança</value></data>
   <data name="Err_SecurityMsg"><value>O bloqueio da vista foi evitado. Erro reportado: </value></data>
   <data name="Btn_BackToList"><value>Voltar à Lista</value></data>
@@ -61,4 +61,11 @@
   <data name="Lbl_NA"><value>N/A</value></data>
   <data name="Btn_Excel"><value>📊 Excel</value></data>
   <data name="Tooltip_Excel"><value>Descarregar CSV</value></data>
+  <data name="Lbl_TeamPanel"><value>Utilizadores</value></data>
+  <data name="Btn_Team"><value>👥 Equipa</value></data>
+  <data name="Search_User_Placeholder"><value>Pesquisar utilizador ou email...</value></data>
+  <data name="Lbl_LoadingUsers"><value>A carregar utilizadores...</value></data>
+  <data name="Lbl_NoUsers"><value>Nenhum utilizador encontrado.</value></data>
+  <data name="Lbl_DragUser"><value>Arrastar para a tarefa</value></data>
+  <data name="Err_AssignUser"><value>Erro ao atribuir utilizador: </value></data>
 </root>

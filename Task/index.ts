@@ -78,7 +78,7 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "2.2.14",
+            version: "2.2.16",
             dependenciaFechas: dependFechas, 
             projectId: projectId, 
             context: context,
