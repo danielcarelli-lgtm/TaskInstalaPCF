@@ -293,7 +293,6 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
     }
     private fetchMembers = () => {
         this.setState({ loading: true });
-        // Para el facepile el cache no es un problema crítico, pero podemos asegurar su frescura de la misma forma si fuera necesario.
         const fetchXml = `
         <fetch version="1.0" mapping="logical" no-lock="false" distinct="true">
             <entity name="sec_miembrodelequipo">
@@ -305,7 +304,6 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
             </entity>
         </fetch>`;
         
-        // Aquí añadimos también un parámetro dinámico en el XML para evitar la cache del facepile
         const cacheBusterXml = fetchXml.replace('</filter>', `<condition attribute="sec_name" operator="ne" value="cb_${Date.now()}"/>\n</filter>`);
         
         const query = `?fetchXml=${encodeURIComponent(cacheBusterXml)}`;
@@ -525,6 +523,14 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
         const { rowHeight, tasks: ganttViewTasks, fontFamily, fontSize } = this.props.ganttProps;
         const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onAssignUser, onUnparentTask, teamRefreshTrigger, t } = this.props;
 
+        const formatGanttDate = (date: Date) => {
+            if (!date || isNaN(date.getTime())) return "";
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${d}/${m}/${y}`;
+        };
+
         return (
             <div style={{ fontFamily, fontSize }}>
                 {ganttViewTasks.map((tItem: GanttTask) => {
@@ -575,6 +581,9 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 <a className="link-name" onClick={() => { if(originalTask) onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: !isChild ? 'bold' : 'normal' }}>{tItem.name}</a>
                             </div>
                             <div className="gd-cell w-members"><MemberFacepile taskId={tItem.id} webAPI={webAPI} refreshTrigger={teamRefreshTrigger} t={t} /></div>
+                            {/* RESTAURADAS LAS COLUMNAS DE FECHA EN EL GANTT */}
+                            <div className="gd-cell w-date">{originalTask?.inicio || formatGanttDate(tItem.start)}</div>
+                            <div className="gd-cell w-date">{originalTask?.fin || formatGanttDate(tItem.end)}</div>
                         </div>
                     );
                 })}
@@ -1010,7 +1019,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                 <div className="layout-split">
                     <div className="main-content">
                         {activeView === 'grid' && (
-                            <>
+                            <div className="grid-wrapper">
                                 <div className="grid-header">
                                     <div className="gh-cell w-nro">#</div>
                                     <div className="gh-cell w-prod" title={this.t("Tooltip_AssignedMaterials", "Materiales Asignados")}>📦</div>
@@ -1033,7 +1042,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                                         />
                                     ))}
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {activeView === 'gantt' && (
