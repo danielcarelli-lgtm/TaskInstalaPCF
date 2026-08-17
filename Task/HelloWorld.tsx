@@ -42,6 +42,7 @@ export interface IHelloWorldProps {
     tasks: ITaskItem[]; 
     version: string;
     dependenciaFechas: boolean;
+    moduloProductos: boolean;
     projectId: string;
     context: ComponentFramework.Context<any>; 
     onRefresh: () => void;
@@ -334,7 +335,7 @@ class MemberFacepile extends React.Component<IMemberFacepileProps, IMemberFacepi
 
 // === FILA GRID NORMAL ===
 interface ITaskRowProps { 
-    task: ITaskItem, allTasks: ITaskItem[], isCollapsed: boolean, products: IProductLine[],
+    task: ITaskItem, allTasks: ITaskItem[], isCollapsed: boolean, products: IProductLine[], moduloProductos: boolean,
     onToggle: (id: string) => void, onOpen: (etn: string, id: string) => void, webAPI: ComponentFramework.WebApi,
     onDropAction: (draggedId: string, targetId: string) => void, 
     onAssignProduct: (productId: string, taskId: string) => void,
@@ -366,6 +367,9 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
 
         try {
             const parsed = JSON.parse(rawData);
+            
+            if (parsed.type === 'product' && !this.props.moduloProductos) return;
+
             if (parsed.type === 'task') {
                 const draggedId = parsed.id;
                 if (!draggedId || draggedId === this.props.task.id) return;
@@ -394,11 +398,11 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
     };
     
     render() {
-        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, products, teamRefreshTrigger, t } = this.props;
+        const { task, allTasks, isCollapsed, onToggle, onOpen, webAPI, products, teamRefreshTrigger, moduloProductos, t } = this.props;
         const isParent = Number.isInteger(task.virtualNro);
         const availableDependencies = allTasks.filter(candidate => candidate.id !== task.id && candidate.depId !== task.id);
         
-        const taskProducts = products.filter(p => p.taskId === task.id);
+        const taskProducts = moduloProductos ? products.filter(p => p.taskId === task.id) : [];
         const hasProducts = taskProducts.length > 0;
         
         let summaryValues: any[] = [];
@@ -422,38 +426,40 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
             <div className={`grid-row ${isParent ? 'row-parent' : 'row-child'} ${this.state.isDragOver ? 'row-drag-over' : ''}`} draggable="true" onDragStart={this.handleDragStart} onDragOver={this.handleDragOver} onDragLeave={this.handleDragLeave} onDrop={this.handleDrop}>
                 <div className="gd-cell w-nro" title={t("Lbl_OrderHierarch", "Orden Jerárquico")}>{task.virtualNro.toFixed(2)}</div>
                 
-                <div className="gd-cell w-prod">
-                    {hasProducts && (
-                        <div className="prod-count-wrapper">
-                            <span style={{ fontSize: '12px' }}>📦</span>
-                            <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#0078d4' }}>{taskProducts.length}</span>
-                            
-                            <div className="prod-tooltip">
-                                <table className="tooltip-table">
-                                    <thead>
-                                        <tr>
-                                            <th>{t("Lbl_Product", "Producto")}</th><th>{t("Col_ID", "ID")}</th>
-                                            <th style={{textAlign:'center'}}>{t("Lbl_Pend_Short", "Pdte.")}</th>
-                                            <th style={{textAlign:'center'}}>{t("Lbl_Inst_Short", "Inst.")}</th>
-                                            <th style={{textAlign:'center'}}>{t("Lbl_Dev_Short", "Dev.")}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {summaryValues.map((s, idx) => (
-                                            <tr key={idx}>
-                                                <td>{s.name}</td>
-                                                <td style={{fontFamily: 'monospace'}}>{s.id}</td>
-                                                <td style={{textAlign: 'center'}}>{s.pend}</td>
-                                                <td style={{textAlign: 'center'}}>{s.inst}</td>
-                                                <td style={{textAlign: 'center'}}>{s.dev}</td>
+                {moduloProductos && (
+                    <div className="gd-cell w-prod">
+                        {hasProducts && (
+                            <div className="prod-count-wrapper">
+                                <span style={{ fontSize: '12px' }}>📦</span>
+                                <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#0078d4' }}>{taskProducts.length}</span>
+                                
+                                <div className="prod-tooltip">
+                                    <table className="tooltip-table">
+                                        <thead>
+                                            <tr>
+                                                <th>{t("Lbl_Product", "Producto")}</th><th>{t("Col_ID", "ID")}</th>
+                                                <th style={{textAlign:'center'}}>{t("Lbl_Pend_Short", "Pdte.")}</th>
+                                                <th style={{textAlign:'center'}}>{t("Lbl_Inst_Short", "Inst.")}</th>
+                                                <th style={{textAlign:'center'}}>{t("Lbl_Dev_Short", "Dev.")}</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {summaryValues.map((s, idx) => (
+                                                <tr key={idx}>
+                                                    <td>{s.name}</td>
+                                                    <td style={{fontFamily: 'monospace'}}>{s.id}</td>
+                                                    <td style={{textAlign: 'center'}}>{s.pend}</td>
+                                                    <td style={{textAlign: 'center'}}>{s.inst}</td>
+                                                    <td style={{textAlign: 'center'}}>{s.dev}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="gd-cell w-id" title={task.idTarea}>{task.idTarea}</div>
                 <div className="gd-cell w-name" title={task.nombre}>
@@ -521,7 +527,7 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
     constructor(props: any) { super(props); this.state = { dragOverId: null }; }
     render() {
         const { rowHeight, tasks: ganttViewTasks, fontFamily, fontSize } = this.props.ganttProps;
-        const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onAssignUser, onUnparentTask, teamRefreshTrigger, t } = this.props;
+        const { tasks, webAPI, onOpenTask, onReparentTask, onAssignProduct, onAssignUser, onUnparentTask, teamRefreshTrigger, moduloProductos, t } = this.props;
 
         const formatGanttDate = (date: Date) => {
             if (!date || isNaN(date.getTime())) return "";
@@ -551,6 +557,9 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                         
                         try {
                             const parsed = JSON.parse(rawData);
+                            
+                            if (parsed.type === 'product' && !moduloProductos) return;
+
                             if (parsed.type === 'task') {
                                 const draggedId = parsed.id;
                                 if (!draggedId || draggedId === tItem.id) return;
@@ -581,7 +590,6 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 <a className="link-name" onClick={() => { if(originalTask) onOpenTask(originalTask.entityName, originalTask.id) }} style={{ fontWeight: !isChild ? 'bold' : 'normal' }}>{tItem.name}</a>
                             </div>
                             <div className="gd-cell w-members"><MemberFacepile taskId={tItem.id} webAPI={webAPI} refreshTrigger={teamRefreshTrigger} t={t} /></div>
-                            {/* RESTAURADAS LAS COLUMNAS DE FECHA EN EL GANTT */}
                             <div className="gd-cell w-date">{originalTask?.inicio || formatGanttDate(tItem.start)}</div>
                             <div className="gd-cell w-date">{originalTask?.fin || formatGanttDate(tItem.end)}</div>
                         </div>
@@ -619,7 +627,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             <CustomGanttTable 
                 ganttProps={ganttProps} tasks={this.props.tasks} webAPI={this.props.context.webAPI} t={translateFn} teamRefreshTrigger={this.state.teamRefreshTrigger}
                 onOpenTask={this.props.onOpenTask} onReparentTask={this.props.onReparentTask} onUnparentTask={this.props.onUnparentTask}
-                onAssignProduct={this.handleAssignProduct} onAssignUser={this.handleAssignUser}
+                onAssignProduct={this.handleAssignProduct} onAssignUser={this.handleAssignUser} moduloProductos={this.props.moduloProductos}
             />
         );
     }
@@ -634,14 +642,20 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
 
     componentDidMount() {
         if (this.props.dependenciaFechas) this.syncParentRollups();
-        if (this.props.projectId) this.fetchProducts();
+        if (this.props.moduloProductos && this.props.projectId) this.fetchProducts();
     }
 
     componentDidUpdate(prevProps: IHelloWorldProps, prevState: IHelloWorldState) {
         if (this.props.dependenciaFechas && !this.state.hasError) this.syncParentRollups();
         
-        if (prevProps.projectId !== this.props.projectId || prevState.productRefreshTrigger !== this.state.productRefreshTrigger) {
-            if (this.props.projectId) this.fetchProducts();
+        if (this.props.moduloProductos) {
+            if (prevProps.projectId !== this.props.projectId || 
+                prevState.productRefreshTrigger !== this.state.productRefreshTrigger ||
+                prevProps.moduloProductos !== this.props.moduloProductos) {
+                if (this.props.projectId) this.fetchProducts();
+            }
+        } else if (prevState.isProductsOpen) {
+            this.setState({ isProductsOpen: false });
         }
     }
 
@@ -910,7 +924,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
     }
 
     public render(): React.ReactNode {
-        const { tasks, dependenciaFechas, projectId, context } = this.props;
+        const { tasks, dependenciaFechas, moduloProductos, projectId, context } = this.props;
         const { activeView, ganttViewMode, isProductsOpen, isTeamOpen, products, productsLoading, teamRefreshTrigger } = this.state;
 
         if (this.state.hasError) {
@@ -993,7 +1007,11 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                     <button className="btn-excel" onClick={this.handleExportExcel} title={this.t("Tooltip_Excel", "Descargar CSV")}>{this.t("Btn_Excel", "📊 Excel")}</button>
                     <button className="btn-refresh" onClick={this.handleRefreshAll} title={this.t("Tooltip_RefreshAll", "Recargar todos los datos")}>{this.t("Btn_Refresh", "🔄 Refrescar")}</button>
                     
-                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>{this.t("Msg_DragHint", "💡 Arrastra materiales o usuarios hacia las tareas.")}</span>
+                    <span style={{fontSize:'10px', marginLeft:'10px', color:'#666'}}>
+                        {moduloProductos 
+                            ? this.t("Msg_DragHint", "💡 Arrastra materiales o usuarios hacia las tareas.")
+                            : "💡 Arrastra usuarios hacia las tareas."}
+                    </span>
                     
                     <div className="view-toggle-container">
                         <button className={`btn-view ${activeView === 'grid' ? 'active' : ''}`} onClick={() => this.setState({ activeView: 'grid' })}>{this.t("Btn_List", "Lista")}</button>
@@ -1002,9 +1020,12 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                         <button className={`btn-view ${isTeamOpen ? 'active-team' : ''}`} style={{marginLeft:'10px'}} onClick={() => this.setState({ isTeamOpen: !isTeamOpen, isProductsOpen: false })}>
                             {this.t("Btn_Team", "👥 Equipo")}
                         </button>
-                        <button className={`btn-view ${isProductsOpen ? 'active-prod' : ''}`} onClick={() => this.setState({ isProductsOpen: !isProductsOpen, isTeamOpen: false })}>
-                            {this.t("Btn_Products", "📦 Productos")}
-                        </button>
+                        
+                        {moduloProductos && (
+                            <button className={`btn-view ${isProductsOpen ? 'active-prod' : ''}`} onClick={() => this.setState({ isProductsOpen: !isProductsOpen, isTeamOpen: false })}>
+                                {this.t("Btn_Products", "📦 Productos")}
+                            </button>
+                        )}
                     </div>
 
                     {activeView === 'gantt' && (
@@ -1022,7 +1043,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                             <div className="grid-wrapper">
                                 <div className="grid-header">
                                     <div className="gh-cell w-nro">#</div>
-                                    <div className="gh-cell w-prod" title={this.t("Tooltip_AssignedMaterials", "Materiales Asignados")}>📦</div>
+                                    {moduloProductos && <div className="gh-cell w-prod" title={this.t("Tooltip_AssignedMaterials", "Materiales Asignados")}>📦</div>}
                                     <div className="gh-cell w-id">ID</div>
                                     <div className="gh-cell w-name">{this.t("Col_Name", "NOMBRE")}</div>
                                     <div className="gh-cell w-members">{this.t("Col_Team", "EQUIPO")}</div>
@@ -1036,7 +1057,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                                 </div>
                                 <div className="grid-body">
                                     {visibleTasks.map((task) => (
-                                        <TaskRow key={task.id} task={task} allTasks={this.props.tasks} products={products} isCollapsed={this.state.collapsedParents.includes(task.id)} onToggle={this.toggleParent}
+                                        <TaskRow key={task.id} task={task} allTasks={this.props.tasks} products={products} moduloProductos={moduloProductos} isCollapsed={this.state.collapsedParents.includes(task.id)} onToggle={this.toggleParent}
                                             onOpen={this.props.onOpenTask} webAPI={this.props.context.webAPI} onDropAction={this.props.onReparentTask} onUnparentAction={this.props.onUnparentTask} onUpdateDep={this.props.onUpdateDependency}
                                             onAssignProduct={this.handleAssignProduct} onAssignUser={this.handleAssignUser} teamRefreshTrigger={teamRefreshTrigger} t={this.t}
                                         />
@@ -1068,7 +1089,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
                         <TeamPanel webAPI={this.props.context.webAPI} t={this.t} />
                     )}
 
-                    {isProductsOpen && (
+                    {isProductsOpen && moduloProductos && (
                         <ProductPanel 
                             projectId={projectId} 
                             lines={products}

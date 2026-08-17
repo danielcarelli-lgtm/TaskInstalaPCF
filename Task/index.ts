@@ -13,8 +13,12 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
     public updateView(context: ComponentFramework.Context<IInputs>): void {
         const ds = context.parameters.sampleDataSet;
+        
         const depFechasRaw = context.parameters.dependencia_fechas?.raw;
         const dependFechas = depFechasRaw !== false; 
+
+        const modProdRaw = context.parameters.modulo_productos?.raw;
+        const moduloProductos = modProdRaw !== false; 
         
         const pageContext = context.mode as any;
         const projectId = pageContext.contextInfo?.entityId || "";
@@ -78,8 +82,9 @@ export class NuevaVersionTask implements ComponentFramework.StandardControl<IInp
 
         const props: IHelloWorldProps = { 
             tasks: sortedItems, 
-            version: "2.2.20",
+            version: "2.2.21",
             dependenciaFechas: dependFechas, 
+            moduloProductos: moduloProductos,
             projectId: projectId, 
             context: context,
             onRefresh: () => { ds.refresh(); },

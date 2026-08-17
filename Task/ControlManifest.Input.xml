@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.20" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
+  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.21" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
     
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />
@@ -9,6 +9,7 @@
     <external-service-usage enabled="false" />
 
     <property name="dependencia_fechas" display-name-key="Dependencia de Fechas Padre-Hija" description-key="Si está activo, las fechas de la tarea padre se calculan automáticamente." of-type="TwoOptions" usage="input" default-value="true" />
+    <property name="modulo_productos" display-name-key="Módulo de Productos" description-key="Habilitar/Deshabilitar panel, columna y carga de Productos" of-type="TwoOptions" usage="input" default-value="true" />
     
     <data-set name="sampleDataSet" display-name-key="Dataset de Tareas">
       <property-set name="sec_idtarea" display-name-key="ID" of-type="SingleLine.Text" usage="bound" required="true" />
