@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <data name="Lbl_ProductsPanel"><value>Líneas de Producto</value></data>
+  <data name="Lbl_ProductsPanel"><value>Materiales del Proyecto</value></data>
+  <data name="Tab_ProductLines"><value>Líneas de Producto</value></data>
+  <data name="Tab_ProjectProducts"><value>Productos</value></data>
+  <data name="Lbl_Selected"><value>seleccionados</value></data>
+  <data name="Lbl_PaintHint"><value>💡 Arrastra sobre [✓] para marcar varios</value></data>
+  <data name="Btn_SelectAll"><value>Todos</value></data>
+  <data name="Btn_ClearSelection"><value>Limpiar</value></data>
+  <data name="Lbl_AvailableUnits"><value>disponibles</value></data>
+  <data name="Lbl_DragGroup"><value>Arrastra este bloque a una tarea para asignar las</value></data>
+  <data name="Lbl_Units"><value>unidades</value></data>
   <data name="Btn_Pending"><value>Pendientes</value></data>
   <data name="Btn_Assigned"><value>Asignadas</value></data>
   <data name="Search_Placeholder"><value>Buscar producto, ID, S/N...</value></data>

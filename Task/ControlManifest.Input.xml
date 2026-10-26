@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest>
-  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.21" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
+  <control namespace="secNueva" constructor="NuevaVersionTask" version="2.2.22" display-name-key="Nueva Version Task" description-key="Task Control - Gestión de Instalaciones y Materiales" control-type="standard">
     
     <feature-usage>
       <uses-feature name="WebAPI" required="true" />

@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <data name="Lbl_ProductsPanel"><value>Product Lines</value></data>
+  <data name="Lbl_ProductsPanel"><value>Project Materials</value></data>
+  <data name="Tab_ProductLines"><value>Product Lines</value></data>
+  <data name="Tab_ProjectProducts"><value>Products</value></data>
+  <data name="Lbl_Selected"><value>selected</value></data>
+  <data name="Lbl_PaintHint"><value>💡 Drag across [✓] to select multiple</value></data>
+  <data name="Btn_SelectAll"><value>All</value></data>
+  <data name="Btn_ClearSelection"><value>Clear</value></data>
+  <data name="Lbl_AvailableUnits"><value>available</value></data>
+  <data name="Lbl_DragGroup"><value>Drag this block to a task to assign all</value></data>
+  <data name="Lbl_Units"><value>units</value></data>
   <data name="Btn_Pending"><value>Pending</value></data>
   <data name="Btn_Assigned"><value>Assigned</value></data>
   <data name="Search_Placeholder"><value>Search product, ID, S/N...</value></data>

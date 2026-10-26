@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <root>
-  <data name="Lbl_ProductsPanel"><value>Linhas de Produto</value></data>
+  <data name="Lbl_ProductsPanel"><value>Materiais do Projeto</value></data>
+  <data name="Tab_ProductLines"><value>Linhas de Produto</value></data>
+  <data name="Tab_ProjectProducts"><value>Produtos</value></data>
+  <data name="Lbl_Selected"><value>selecionados</value></data>
+  <data name="Lbl_PaintHint"><value>💡 Arraste sobre [✓] para marcar vários</value></data>
+  <data name="Btn_SelectAll"><value>Todos</value></data>
+  <data name="Btn_ClearSelection"><value>Limpar</value></data>
+  <data name="Lbl_AvailableUnits"><value>disponíveis</value></data>
+  <data name="Lbl_DragGroup"><value>Arraste este bloco para uma tarefa para atribuir as</value></data>
+  <data name="Lbl_Units"><value>unidades</value></data>
   <data name="Btn_Pending"><value>Pendentes</value></data>
   <data name="Btn_Assigned"><value>Atribuídas</value></data>
   <data name="Search_Placeholder"><value>Pesquisar produto, ID, S/N...</value></data>
@@ -55,7 +64,7 @@
   <data name="Err_Dependency"><value>Erro de dependência: </value></data>
   <data name="Err_Dates"><value>Erro de datas: </value></data>
   <data name="Err_Rollup"><value>Erro ao sincronizar rollup: </value></data>
-  <data name="Lbl_UnknownProduct"><value>Produto Desconhecido</value></data>
+  <data name="Lbl_UnknownProduct"><value>Produto Desconocido</value></data>
   <data name="Lbl_OrderHierarch"><value>Ordem Hierárquica</value></data>
   <data name="Lbl_More"><value>mais</value></data>
   <data name="Lbl_NA"><value>N/A</value></data>

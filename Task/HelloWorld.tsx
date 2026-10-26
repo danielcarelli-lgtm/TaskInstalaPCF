@@ -24,6 +24,7 @@ export interface IProductLine {
     id: string; 
     name: string; 
     productName: string; 
+    projectProductId: string;
     taskId: string | null; 
     serialNumber?: string;
     status?: string;
@@ -168,26 +169,122 @@ class TeamPanel extends React.Component<ITeamPanelProps, ITeamPanelState> {
     }
 }
 
-// === PANEL LATERAL DE PRODUCTOS ===
+// === PANEL LATERAL DE PRODUCTOS Y LÍNEAS ===
+interface IProductGroup {
+    groupId: string;
+    productName: string;
+    productNumber: string;
+    allLines: IProductLine[];
+    pendingUnassignedLines: IProductLine[];
+    assignedLines: IProductLine[];
+}
+
 interface IProductPanelProps { 
     projectId: string; 
     lines: IProductLine[];
     loading: boolean;
-    onUnassign: (id: string) => void; 
-    onUpdateStatus: (id: string, newStatus: number) => void;
+    onUnassign: (ids: string[]) => void; 
+    onUpdateStatus: (ids: string[], newStatus: number) => void;
     t: TranslateFn;
 }
-interface IProductPanelState { filter: 'unassigned' | 'assigned'; searchQuery: string; }
+
+interface IProductPanelState { 
+    activeTab: 'lines' | 'groups';
+    filter: 'unassigned' | 'assigned'; 
+    searchQuery: string; 
+    selectedIds: string[];
+    isPainting: boolean;
+    paintValue: boolean;
+}
 
 class ProductPanel extends React.Component<IProductPanelProps, IProductPanelState> {
     constructor(props: IProductPanelProps) {
         super(props);
-        this.state = { filter: 'unassigned', searchQuery: '' };
+        this.state = { 
+            activeTab: 'lines',
+            filter: 'unassigned', 
+            searchQuery: '',
+            selectedIds: [],
+            isPainting: false,
+            paintValue: true
+        };
     }
+
+    componentDidMount() {
+        window.addEventListener('mouseup', this.handleGlobalMouseUp);
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('mouseup', this.handleGlobalMouseUp);
+    }
+
+    componentDidUpdate(prevProps: IProductPanelProps) {
+        if (prevProps.lines !== this.props.lines) {
+            const validUnassignedIds = new Set(
+                this.props.lines
+                    .filter(l => !l.taskId && l.rawStatus === 909540000)
+                    .map(l => l.id)
+            );
+            this.setState(prevState => ({
+                selectedIds: prevState.selectedIds.filter(id => validUnassignedIds.has(id))
+            }));
+        }
+    }
+
+    private handleGlobalMouseUp = () => {
+        if (this.state.isPainting) {
+            this.setState({ isPainting: false });
+        }
+    };
+
+    private handleCheckboxMouseDown = (e: React.MouseEvent, lineId: string, isDraggable: boolean) => {
+        e.stopPropagation();
+        e.preventDefault(); // Evita iniciar drag HTML5 mientras barremos checkboxes
+        if (!isDraggable) return;
+
+        this.setState(prevState => {
+            const isSelected = prevState.selectedIds.includes(lineId);
+            const nextPaintValue = !isSelected;
+            const nextSelected = nextPaintValue
+                ? [...prevState.selectedIds, lineId]
+                : prevState.selectedIds.filter(id => id !== lineId);
+
+            return {
+                isPainting: true,
+                paintValue: nextPaintValue,
+                selectedIds: nextSelected
+            };
+        });
+    };
+
+    private handleCardMouseEnter = (lineId: string, isDraggable: boolean) => {
+        if (!this.state.isPainting || !isDraggable) return;
+
+        this.setState(prevState => {
+            const alreadySelected = prevState.selectedIds.includes(lineId);
+            if (prevState.paintValue && !alreadySelected) {
+                return { selectedIds: [...prevState.selectedIds, lineId] };
+            } else if (!prevState.paintValue && alreadySelected) {
+                return { selectedIds: prevState.selectedIds.filter(id => id !== lineId) };
+            }
+            return null;
+        });
+    };
+
+    private handleSelectAllVisible = (visibleDraggableIds: string[]) => {
+        this.setState(prevState => {
+            const combined = new Set([...prevState.selectedIds, ...visibleDraggableIds]);
+            return { selectedIds: Array.from(combined) };
+        });
+    };
+
+    private handleClearSelection = () => {
+        this.setState({ selectedIds: [] });
+    };
     
     render() {
         const { lines, loading, projectId, onUnassign, onUpdateStatus, t } = this.props;
-        const { filter, searchQuery } = this.state;
+        const { activeTab, filter, searchQuery, selectedIds, isPainting } = this.state;
         
         const pendingLines = lines.filter(l => !l.taskId);
         const assignedLines = lines.filter(l => !!l.taskId);
@@ -205,9 +302,63 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
             );
         });
 
+        const visibleDraggableIds = visibleLines
+            .filter(l => filter === 'unassigned' && l.rawStatus === 909540000)
+            .map(l => l.id);
+
+        // Agrupación por Producto de Proyecto (para la solapa "Productos")
+        const groupsMap: Record<string, IProductGroup> = {};
+        lines.forEach(l => {
+            const gKey = l.projectProductId || `${l.productNumber}_${l.productName}`;
+            if (!groupsMap[gKey]) {
+                groupsMap[gKey] = {
+                    groupId: gKey,
+                    productName: l.productName,
+                    productNumber: l.productNumber || t("Lbl_NA", "N/A"),
+                    allLines: [],
+                    pendingUnassignedLines: [],
+                    assignedLines: []
+                };
+            }
+            groupsMap[gKey].allLines.push(l);
+            if (!l.taskId && l.rawStatus === 909540000) {
+                groupsMap[gKey].pendingUnassignedLines.push(l);
+            }
+            if (l.taskId) {
+                groupsMap[gKey].assignedLines.push(l);
+            }
+        });
+
+        const allGroups = Object.values(groupsMap).filter(g => {
+            if (filter === 'unassigned' && g.pendingUnassignedLines.length === 0) return false;
+            if (filter === 'assigned' && g.assignedLines.length === 0) return false;
+            if (!query) return true;
+            return (
+                g.productName.toLowerCase().includes(query) ||
+                g.productNumber.toLowerCase().includes(query)
+            );
+        });
+
         return (
             <div className="products-panel">
-                <div className="panel-header">{t("Lbl_ProductsPanel", "Líneas de Producto")}</div>
+                <div className="panel-header">{t("Lbl_ProductsPanel", "Materiales del Proyecto")}</div>
+                
+                {/* SOLAPAS: LÍNEAS DE PRODUCTO vs PRODUCTOS DE PROYECTO */}
+                <div className="subtabs-container">
+                    <button 
+                        className={`btn-subtab ${activeTab === 'lines' ? 'active' : ''}`} 
+                        onClick={() => this.setState({ activeTab: 'lines' })}
+                    >
+                        📋 {t("Tab_ProductLines", "Líneas de Producto")}
+                    </button>
+                    <button 
+                        className={`btn-subtab ${activeTab === 'groups' ? 'active' : ''}`} 
+                        onClick={() => this.setState({ activeTab: 'groups' })}
+                    >
+                        📦 {t("Tab_ProjectProducts", "Productos")}
+                    </button>
+                </div>
+
                 <div className="switch-container">
                     <button className={`btn-switch ${filter === 'unassigned' ? 'active' : ''}`} onClick={() => this.setState({ filter: 'unassigned' })}>
                         {t("Btn_Pending", "Pendientes")} ({pendingLines.length})
@@ -226,18 +377,45 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                         onChange={(e) => this.setState({ searchQuery: e.target.value })} 
                     />
                 </div>
+
+                {/* BARRA DE SELECCIÓN MÚLTIPLE EN SOLAPA LÍNEAS */}
+                {activeTab === 'lines' && filter === 'unassigned' && visibleDraggableIds.length > 0 && (
+                    <div className="selection-toolbar">
+                        <span className="selection-count">
+                            {selectedIds.length > 0 
+                                ? `${selectedIds.length} ${t("Lbl_Selected", "seleccionados")}`
+                                : t("Lbl_PaintHint", "💡 Arrastra sobre [✓] para marcar varios")}
+                        </span>
+                        <div className="selection-actions">
+                            <button className="btn-sel-link" onClick={() => this.handleSelectAllVisible(visibleDraggableIds)}>
+                                {t("Btn_SelectAll", "Todos")}
+                            </button>
+                            {selectedIds.length > 0 && (
+                                <button className="btn-sel-link clear" onClick={this.handleClearSelection}>
+                                    {t("Btn_ClearSelection", "Limpiar")}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
                 
-                <div className="card-container">
+                <div className="card-container" style={{ userSelect: isPainting ? 'none' : 'auto' }}>
                     {!projectId && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_SaveProjectFirst", "Guarde el proyecto primero.")}</div>}
                     {loading && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_LoadingMaterials", "Cargando materiales...")}</div>}
-                    {!loading && visibleLines.length === 0 && <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_NoMatchingLines", "No hay líneas que coincidan.")}</div>}
                     
-                    {!loading && visibleLines.map(line => {
+                    {/* === VISTA 1: LÍNEAS DE PRODUCTO === */}
+                    {!loading && activeTab === 'lines' && visibleLines.length === 0 && (
+                        <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_NoMatchingLines", "No hay líneas que coincidan.")}</div>
+                    )}
+
+                    {!loading && activeTab === 'lines' && visibleLines.map(line => {
                         const isDraggable = filter === 'unassigned' && line.rawStatus === 909540000;
+                        const isSelected = selectedIds.includes(line.id);
                         
                         const onDragStart = (e: React.DragEvent) => {
-                            if (!isDraggable) { e.preventDefault(); return; }
-                            e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'product', id: line.id }));
+                            if (!isDraggable || isPainting) { e.preventDefault(); return; }
+                            const idsToDrag = isSelected && selectedIds.length > 0 ? selectedIds : [line.id];
+                            e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'products', ids: idsToDrag }));
                             e.dataTransfer.effectAllowed = "copyMove";
                         };
 
@@ -246,11 +424,37 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                         else if (line.rawStatus === 909540001) statusClass = "prod-status-inst";
                         else if (line.rawStatus === 909540002) statusClass = "prod-status-dev";
 
-                        const titleDrag = isDraggable ? t("Lbl_DragToTask", "Arrastrar a tarea") : (filter === 'unassigned' ? t("Lbl_OnlyPendingDrag", "Solo los materiales Pendientes se pueden asignar") : "");
+                        const titleDrag = isDraggable 
+                            ? (isSelected && selectedIds.length > 1 ? `${t("Lbl_DragToTask", "Arrastrar a tarea")} (${selectedIds.length})` : t("Lbl_DragToTask", "Arrastrar a tarea"))
+                            : (filter === 'unassigned' ? t("Lbl_OnlyPendingDrag", "Solo los materiales Pendientes se pueden asignar") : "");
 
                         return (
-                            <div key={line.id} className={`prod-card ${!isDraggable && filter === 'unassigned' ? 'not-draggable' : ''}`} draggable={isDraggable} onDragStart={onDragStart} title={titleDrag}>
-                                <div className="card-title">{line.productName}</div>
+                            <div 
+                                key={line.id} 
+                                className={`prod-card ${!isDraggable && filter === 'unassigned' ? 'not-draggable' : ''} ${isSelected ? 'selected-card' : ''}`} 
+                                draggable={isDraggable && !isPainting} 
+                                onDragStart={onDragStart} 
+                                onMouseEnter={() => this.handleCardMouseEnter(line.id, isDraggable)}
+                                title={titleDrag}
+                            >
+                                <div className="card-top-row">
+                                    {isDraggable && (
+                                        <div 
+                                            className="checkbox-hit-area"
+                                            onMouseDown={(e) => this.handleCheckboxMouseDown(e, line.id, isDraggable)}
+                                            title={t("Lbl_PaintHint", "Haz clic y arrastra para marcar varios")}
+                                        >
+                                            <input 
+                                                type="checkbox" 
+                                                className="prod-checkbox" 
+                                                checked={isSelected} 
+                                                readOnly 
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="card-title" style={{ flex: 1 }}>{line.productName}</div>
+                                </div>
+
                                 <div className="card-sub">{line.name}</div>
                                 <div className="card-id">ID: {line.productNumber || t("Lbl_NA", "N/A")}</div>
                                 {line.serialNumber && <div style={{color: '#777', fontSize: '9px', marginTop: '2px'}}>S/N: {line.serialNumber}</div>}
@@ -263,12 +467,67 @@ class ProductPanel extends React.Component<IProductPanelProps, IProductPanelStat
                                 
                                 <div className="card-actions">
                                     {filter === 'assigned' && line.rawStatus === 909540000 && (
-                                        <button className="btn-release" onClick={() => onUnassign(line.id)}>{t("Btn_Release", "Liberar")}</button>
+                                        <button className="btn-release" onClick={() => onUnassign([line.id])}>{t("Btn_Release", "Liberar")}</button>
                                     )}
                                     {line.rawStatus === 909540000 && (
-                                        <button className="btn-install" onClick={() => onUpdateStatus(line.id, 909540001)}>{t("Btn_Install", "Instalar")}</button>
+                                        <button className="btn-install" onClick={() => onUpdateStatus([line.id], 909540001)}>{t("Btn_Install", "Instalar")}</button>
                                     )}
                                 </div>
+                            </div>
+                        );
+                    })}
+
+                    {/* === VISTA 2: GRUPOS POR PRODUCTO DE PROYECTO === */}
+                    {!loading && activeTab === 'groups' && allGroups.length === 0 && (
+                        <div style={{padding:'10px', color:'#666', fontSize:'11px', gridColumn:'span 2'}}>{t("Lbl_NoMatchingLines", "No hay productos que coincidan.")}</div>
+                    )}
+
+                    {!loading && activeTab === 'groups' && allGroups.map(group => {
+                        const pendingIds = group.pendingUnassignedLines.map(l => l.id);
+                        const assignedPendingIds = group.assignedLines.filter(l => l.rawStatus === 909540000).map(l => l.id);
+                        const isGroupDraggable = filter === 'unassigned' && pendingIds.length > 0;
+
+                        const onGroupDragStart = (e: React.DragEvent) => {
+                            if (!isGroupDraggable) { e.preventDefault(); return; }
+                            e.dataTransfer.setData("text/plain", JSON.stringify({ type: 'products', ids: pendingIds }));
+                            e.dataTransfer.effectAllowed = "copyMove";
+                        };
+
+                        return (
+                            <div 
+                                key={group.groupId} 
+                                className={`prod-card group-card ${!isGroupDraggable && filter === 'unassigned' ? 'not-draggable' : ''}`}
+                                style={{ gridColumn: 'span 2' }}
+                                draggable={isGroupDraggable}
+                                onDragStart={onGroupDragStart}
+                                title={isGroupDraggable ? `${t("Lbl_DragGroup", "Arrastrar grupo completo")} (${pendingIds.length})` : ""}
+                            >
+                                <div className="card-top-row">
+                                    <div className="card-title" style={{ flex: 1 }}>📦 {group.productName}</div>
+                                    <span className="group-badge">
+                                        {filter === 'unassigned' 
+                                            ? `${pendingIds.length} / ${group.allLines.length} ${t("Lbl_AvailableUnits", "disponibles")}`
+                                            : `${group.assignedLines.length} / ${group.allLines.length} ${t("Btn_Assigned", "Asignadas").toLowerCase()}`}
+                                    </span>
+                                </div>
+                                <div className="card-id">ID: {group.productNumber}</div>
+
+                                {isGroupDraggable && (
+                                    <div className="group-drag-hint">
+                                        ⠿ {t("Lbl_DragGroup", "Arrastra este bloque a una tarea para asignar las")} {pendingIds.length} {t("Lbl_Units", "unidades")}
+                                    </div>
+                                )}
+
+                                {filter === 'assigned' && assignedPendingIds.length > 0 && (
+                                    <div className="card-actions" style={{ marginTop: '8px' }}>
+                                        <button className="btn-release" onClick={() => onUnassign(assignedPendingIds)}>
+                                            {t("Btn_Release", "Liberar")} ({assignedPendingIds.length})
+                                        </button>
+                                        <button className="btn-install" onClick={() => onUpdateStatus(assignedPendingIds, 909540001)}>
+                                            {t("Btn_Install", "Instalar")} ({assignedPendingIds.length})
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
@@ -338,7 +597,7 @@ interface ITaskRowProps {
     task: ITaskItem, allTasks: ITaskItem[], isCollapsed: boolean, products: IProductLine[], moduloProductos: boolean,
     onToggle: (id: string) => void, onOpen: (etn: string, id: string) => void, webAPI: ComponentFramework.WebApi,
     onDropAction: (draggedId: string, targetId: string) => void, 
-    onAssignProduct: (productId: string, taskId: string) => void,
+    onAssignProduct: (productIds: string[], taskId: string) => void,
     onAssignUser: (userId: string, userName: string, taskId: string) => void,
     onUnparentAction: (id: string) => void, onUpdateDep: (taskId: string, depId: string | null) => void,
     teamRefreshTrigger: number,
@@ -368,7 +627,7 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
         try {
             const parsed = JSON.parse(rawData);
             
-            if (parsed.type === 'product' && !this.props.moduloProductos) return;
+            if ((parsed.type === 'product' || parsed.type === 'products') && !this.props.moduloProductos) return;
 
             if (parsed.type === 'task') {
                 const draggedId = parsed.id;
@@ -376,15 +635,17 @@ class TaskRow extends React.Component<ITaskRowProps, ITaskRowState> {
                 if (this.props.task.parentId) { alert(this.props.t("Alert_DenyGrandchild", "⚠️ Acción Denegada: No aceptamos 'nietos'.")); return; }
                 if (this.props.allTasks.some(t => t.parentId === draggedId)) { alert(this.props.t("Alert_DenyHasChildren", "🛑 Acción Denegada: La tarea tiene subtareas.")); return; }
                 this.props.onDropAction(draggedId, this.props.task.id);
-            } else if (parsed.type === 'product' || parsed.type === 'user') {
+            } else if (parsed.type === 'product' || parsed.type === 'products' || parsed.type === 'user') {
                 const hasChildren = this.props.allTasks.some(t => t.parentId === this.props.task.id);
                 if (hasChildren) { 
                     alert(this.props.t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar recursos a tareas que contienen subtareas.")); 
                     return; 
                 }
                 
-                if (parsed.type === 'product') {
-                    this.props.onAssignProduct(parsed.id, this.props.task.id);
+                if (parsed.type === 'products') {
+                    this.props.onAssignProduct(parsed.ids || [], this.props.task.id);
+                } else if (parsed.type === 'product') {
+                    this.props.onAssignProduct([parsed.id], this.props.task.id);
                 } else if (parsed.type === 'user') {
                     this.props.onAssignUser(parsed.id, parsed.name, this.props.task.id);
                 }
@@ -558,7 +819,7 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                         try {
                             const parsed = JSON.parse(rawData);
                             
-                            if (parsed.type === 'product' && !moduloProductos) return;
+                            if ((parsed.type === 'product' || parsed.type === 'products') && !moduloProductos) return;
 
                             if (parsed.type === 'task') {
                                 const draggedId = parsed.id;
@@ -566,15 +827,17 @@ class CustomGanttTable extends React.Component<any, { dragOverId: string | null 
                                 if (originalTask && originalTask.parentId) { alert(t("Alert_DenyGrandchild", "⚠️ Acción Denegada: No aceptamos 'nietos'.")); return; }
                                 if (tasks.some((x:any) => x.parentId === draggedId)) { alert(t("Alert_DenyHasChildren", "🛑 Acción Denegada: La tarea tiene subtareas.")); return; }
                                 onReparentTask(draggedId, tItem.id);
-                            } else if (parsed.type === 'product' || parsed.type === 'user') {
+                            } else if (parsed.type === 'product' || parsed.type === 'products' || parsed.type === 'user') {
                                 const hasChildren = tasks.some((x:any) => x.parentId === tItem.id);
                                 if (hasChildren) { 
                                     alert(t("Alert_DenyAssignParent", "⚠️ Acción Denegada: No se pueden asignar recursos a tareas que contienen subtareas.")); 
                                     return; 
                                 }
 
-                                if (parsed.type === 'product') {
-                                    onAssignProduct(parsed.id, tItem.id);
+                                if (parsed.type === 'products') {
+                                    onAssignProduct(parsed.ids || [], tItem.id);
+                                } else if (parsed.type === 'product') {
+                                    onAssignProduct([parsed.id], tItem.id);
                                 } else if (parsed.type === 'user') {
                                     onAssignUser(parsed.id, parsed.name, tItem.id);
                                 }
@@ -632,7 +895,6 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         );
     }
 
-    // Acceso centralizado a recursos
     private t = (key: string, fallback: string) => this.props.context.resources.getString(key) || fallback;
 
     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -673,6 +935,7 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             <attribute name="sec_lineadeproductodeproyectoid" />
             <attribute name="sec_name" />
             <attribute name="sec_tareadeproyectoid" />
+            <attribute name="sec_productodeproyectoid" />
             <attribute name="sec_numerodeserie" />
             <attribute name="sec_estadodelproducto" />
             <attribute name="sec_descripciondelaubicacion" />
@@ -696,10 +959,12 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
             (result: any) => {
                 const lines: IProductLine[] = result.entities.map((e: any) => {
                     const prodName = e["ac.sec_nombre"] || e["_sec_productodeproyectoid_value@OData.Community.Display.V1.FormattedValue"] || this.t("Lbl_UnknownProduct", "Producto Desconocido");
+                    const projProdId = e._sec_productodeproyectoid_value || e.sec_productodeproyectoid || prodName;
                     return {
                         id: e.sec_lineadeproductodeproyectoid,
                         name: e.sec_name,
                         productName: prodName,
+                        projectProductId: String(projProdId).replace(/[{}]/g, '').toLowerCase(),
                         taskId: e._sec_tareadeproyectoid_value || e.sec_tareadeproyectoid || null,
                         serialNumber: e.sec_numerodeserie,
                         status: e["sec_estadodelproducto@OData.Community.Display.V1.FormattedValue"] || e.sec_estadodelproducto,
@@ -773,29 +1038,42 @@ export class HelloWorld extends React.Component<IHelloWorldProps, IHelloWorldSta
         });
     }
 
-    private handleUnassignProduct = (productId: string) => {
+    private handleUnassignProduct = (productIds: string[]) => {
+        if (!productIds || productIds.length === 0) return;
         const data = { "sec_tareadeproyectoid": null };
-        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+        const promises = productIds.map((pid: string) =>
+            this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", pid, data)
+        );
+        Promise.all(promises)
         .then(() => {
             this.setState({ productRefreshTrigger: Date.now() });
-        }, (err) => {
+        }, (err: any) => {
             this.props.context.navigation.openErrorDialog({ message: this.t("Err_ReleaseProduct", "Error liberando producto: ") + err.message });
         });
     }
 
-    private handleAssignProduct = (productId: string, taskId: string) => {
-        const data = { "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${taskId})` };
-        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+    private handleAssignProduct = (productIds: string[], taskId: string) => {
+        if (!productIds || productIds.length === 0) return;
+        const cleanTaskId = taskId.replace(/[{}]/g, '');
+        const data = { "sec_tareadeproyectoid@odata.bind": `/sec_tareas(${cleanTaskId})` };
+        const promises = productIds.map((pid: string) =>
+            this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", pid, data)
+        );
+        Promise.all(promises)
         .then(() => {
             this.setState({ productRefreshTrigger: Date.now() });
-        }, (err) => {
+        }, (err: any) => {
             this.props.context.navigation.openErrorDialog({ message: this.t("Err_AssignProduct", "Error asignando producto: ") + err.message });
         });
     }
 
-    private handleUpdateProductStatus = (productId: string, newStatus: number) => {
+    private handleUpdateProductStatus = (productIds: string[], newStatus: number) => {
+        if (!productIds || productIds.length === 0) return;
         const data = { "sec_estadodelproducto": newStatus };
-        this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", productId, data)
+        const promises = productIds.map((pid: string) =>
+            this.props.context.webAPI.updateRecord("sec_lineadeproductodeproyecto", pid, data)
+        );
+        Promise.all(promises)
         .then(() => {
             this.setState({ productRefreshTrigger: Date.now() });
         }, (err: any) => {
